@@ -1,5 +1,5 @@
-use starknet::ContractAddress;
 use contracts::structs::piggystructs::Asset;
+use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IPiggyStark<TContractState> {
