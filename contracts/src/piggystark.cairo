@@ -5,13 +5,14 @@ pub mod PiggyStark {
         structs::piggystructs::Asset
     };
     use starknet::ContractAddress;
+    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess};
     #[storage]
     struct Storage {
        owner: ContractAddress,
        // Mapping from user address to the token address they deposited
-        deposited_token: LegacyMap<ContractAddress, ContractAddress>,
+        deposited_token: Map::<ContractAddress, ContractAddress>,
         // Mapping from (user address, token address) to deposit amount
-        deposit_values: LegacyMap<(ContractAddress, ContractAddress), u256>,
+        deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
     }
 
     fn constructor(){
