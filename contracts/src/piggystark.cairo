@@ -22,8 +22,5 @@ pub mod PiggyStark {
         fn deposit(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
         fn get_user_assets(self: @ContractState) -> Array<Asset> {}
-        fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
-            self.balance.read(token_address);
-        }
     }
 }
