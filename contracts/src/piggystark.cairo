@@ -3,9 +3,9 @@ pub mod PiggyStark {
     use contracts::interfaces::ipiggystark::IPiggyStark;
     use contracts::structs::piggystructs::Asset;
     use core::num::traits::Zero;
-    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess};
     use starknet::{ContractAddress, get_caller_address};
-
+    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess};
+    
     #[storage]
     struct Storage {
         owner: ContractAddress,
