@@ -10,7 +10,7 @@ pub mod PiggyStark {
         StoragePointerWriteAccess,
     };
 
-    // Added balance_of to sTorage struct
+    // Added balance_of to Storage struct
     #[storage]
     struct Storage {
         balance_of: Map<ContractAddress, u256>
