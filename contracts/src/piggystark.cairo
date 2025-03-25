@@ -5,18 +5,13 @@ pub mod PiggyStark {
         structs::piggystructs::Asset,
         interfaces::ierc20::IERC20Dispatcher,
         interfaces::ierc20::IERC20DispatcherTrait,
-
     };
     use starknet::ContractAddress;
     use core::array::ArrayTrait;
     use starknet::{ get_caller_address };
     use starknet::storage::{StorageMapReadAccess, StorageMapWriteAccess};
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
-
-
-
     use core::traits::TryInto;
-        
 
     #[storage]
     struct Storage {
