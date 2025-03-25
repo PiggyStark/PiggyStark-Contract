@@ -13,6 +13,7 @@ pub mod PiggyStark {
         deposited_token: Map::<ContractAddress, ContractAddress>,
         // Mapping from (user address, token address) to deposit amount
         deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
+        balance: Map<ContractAddress, u256
     }
 
     fn constructor(){
@@ -24,6 +25,8 @@ pub mod PiggyStark {
         fn deposit(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
         fn get_user_assets(self: @ContractState) -> Array<Asset> {}
-        fn get_token_balance(self: @ContractState, token_address: ContractAddress) {}
+        fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
+            self.balance.read(token_address)
+        }
     }
 }
