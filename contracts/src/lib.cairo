@@ -1,6 +1,6 @@
 pub mod interfaces {
-    pub mod ipiggystark;
     pub mod ierc20;
+    pub mod ipiggystark;
 }
 
 pub mod structs {
