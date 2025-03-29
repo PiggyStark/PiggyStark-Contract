@@ -5,23 +5,30 @@ pub mod PiggyStark {
         structs::piggystructs::Asset
     };
     use starknet::ContractAddress;
-    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess};
+    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait, MutableVecTrait};
     #[storage]
     struct Storage {
        owner: ContractAddress,
        // Mapping from user address to the token address they deposited
-        deposited_token: Map::<ContractAddress, ContractAddress>,
+       user_deposits: Map::<ContractAddress, Vec<(ContractAddress, u256)>>, // Map user address to a Vec of token address, token amount pair
+    //    locked_funds: Map::<ContractAddress, Vec<(ContractAddress, u256)>>,
+        // deposited_token: Map::<ContractAddress, ContractAddress>,
         // Mapping from (user address, token address) to deposit amount
-        deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
+        // deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
+        
     }
 
-    fn constructor(){
 
+    #[constructor]
+    fn constructor(ref self: ContractState, owner: ContractAddress){
+        self.owner.write(owner);
     }
 
     #[abi(embed_v0)]
     impl PiggyStarkImpl of IPiggyStark<ContractState> {
-        fn deposit(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
+        fn deposit(ref self: ContractState, token_address: ContractAddress, amount: u256) {
+
+        }
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
         fn get_user_assets(self: @ContractState) -> Array<Asset> {}
         fn get_token_balance(self: @ContractState, token_address: ContractAddress) {}
