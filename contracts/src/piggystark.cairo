@@ -14,8 +14,10 @@ pub mod PiggyStark {
     //    locked_funds: Map::<ContractAddress, Vec<(ContractAddress, u256)>>,
         // deposited_token: Map::<ContractAddress, ContractAddress>,
         // Mapping from (user address, token address) to deposit amount
+        deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
+        balance: Map<ContractAddress, u256
         // deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
-        
+
     }
 
 
@@ -31,6 +33,8 @@ pub mod PiggyStark {
         }
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
         fn get_user_assets(self: @ContractState) -> Array<Asset> {}
-        fn get_token_balance(self: @ContractState, token_address: ContractAddress) {}
+        fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
+            self.balance.read(token_address)
+        }
     }
 }
