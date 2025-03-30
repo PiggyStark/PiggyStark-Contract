@@ -1,21 +1,26 @@
 #[starknet::contract]
 pub mod PiggyStark {
+    use contracts::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use contracts::interfaces::ipiggystark::IPiggyStark;
     use contracts::structs::piggystructs::Asset;
     use core::num::traits::Zero;
-    use starknet::{ContractAddress, get_caller_address};
-    use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait, MutableVecTrait};
-    use core::num::traits::Zero;
-    
+    use starknet::storage::{
+        Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+        Vec, VecTrait,
+    };
+    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+
     #[storage]
     struct Storage {
-       owner: ContractAddress,
-       // Mapping from user address to the token address they deposited
-       user_deposits: Map::<ContractAddress, Vec<(ContractAddress, u256)>>, // Map user address to a Vec of token address, token amount pair
-    //    locked_funds: Map::<ContractAddress, Vec<(ContractAddress, u256)>>,
-        // deposited_token: Map::<ContractAddress, ContractAddress>,
-        // Mapping from (user address, token address) to deposit amount
-        // deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
+        owner: ContractAddress,
+        // Mapping from user address to the token address they deposited
+        user_deposits: Map<
+            ContractAddress, Map<ContractAddress, u256>,
+        > // Map user address to a nested map of token address -> token amount
+        //    locked_funds: Map::<ContractAddress, Vec<(ContractAddress, u256)>>,
+    // deposited_token: Map::<ContractAddress, ContractAddress>,
+    // Mapping from (user address, token address) to deposit amount
+    // deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
 
     }
 
@@ -34,7 +39,7 @@ pub mod PiggyStark {
 
 
     #[constructor]
-    fn constructor(ref self: ContractState, owner: ContractAddress){
+    fn constructor(ref self: ContractState, owner: ContractAddress) {
         self.owner.write(owner);
     }
 
@@ -52,12 +57,14 @@ pub mod PiggyStark {
                 .transfer_from(caller, contract, amount);
 
             // Update user deposit balance
+            let prev_deposit = self.user_deposits.entry(caller).entry(token_address).read();
+            self.user_deposits.entry(caller).entry(token_address).write(prev_deposit + amount);
 
             self.emit(SuccessfulDeposit { caller, token: token_address, amount });
         }
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
 
-       
+
         fn get_user_assets(self: @ContractState) -> Array<Asset> {
             let caller = get_caller_address();
             let mut assets = ArrayTrait::new();
@@ -66,13 +73,14 @@ pub mod PiggyStark {
             let mut i: u64 = 0;
             while i != len {
                 let (token_address, amount) = deposits.at(i).read();
-                assets.append(
-                    Asset {
-                        token_name: "PIGGY STARK",
-                        token_address: token_address,
-                        balance: amount,
-                    }
-                );
+                assets
+                    .append(
+                        Asset {
+                            token_name: "PIGGY STARK",
+                            token_address: token_address,
+                            balance: amount,
+                        },
+                    );
                 i = i + 1;
             }
 
