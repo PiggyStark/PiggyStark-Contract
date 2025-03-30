@@ -2,7 +2,7 @@ use starknet::ContractAddress;
 
 #[derive(Drop, Serde, starknet::Store)]
 pub struct Asset {
-    token_name: ByteArray,
-    token_address: ContractAddress,
-    balance: u256
+    pub token_name: ByteArray,
+    pub token_address: ContractAddress,
+    pub balance: u256,
 }

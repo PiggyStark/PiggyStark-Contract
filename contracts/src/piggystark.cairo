@@ -1,11 +1,11 @@
 #[starknet::contract]
 pub mod PiggyStark {
-    use contracts::{
-        interfaces::ipiggystark::IPiggyStark, 
-        structs::piggystructs::Asset
-    };
-    use starknet::ContractAddress;
+    use contracts::interfaces::ipiggystark::IPiggyStark;
+    use contracts::structs::piggystructs::Asset;
+    use core::num::traits::Zero;
+    use starknet::{ContractAddress, get_caller_address};
     use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait, MutableVecTrait};
+    
     #[storage]
     struct Storage {
        owner: ContractAddress,
@@ -30,7 +30,30 @@ pub mod PiggyStark {
 
         }
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {}
-        fn get_user_assets(self: @ContractState) -> Array<Asset> {}
+
+       
+        fn get_user_assets(self: @ContractState) -> Array<Asset> {
+            let caller = get_caller_address();
+            let mut assets = ArrayTrait::new();
+            let deposits = self.user_deposits.entry(caller);
+            let len = deposits.len();
+            let mut i: u64 = 0;
+            while i != len {
+                let (token_address, amount) = deposits.at(i).read();
+                assets.append(
+                    Asset {
+                        token_name: "PIGGY STARK",
+                        token_address: token_address,
+                        balance: amount,
+                    }
+                );
+                i = i + 1;
+            }
+
+            assets
+        }
+
+
         fn get_token_balance(self: @ContractState, token_address: ContractAddress) {}
     }
 }
