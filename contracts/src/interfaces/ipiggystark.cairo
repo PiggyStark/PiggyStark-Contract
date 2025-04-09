@@ -1,5 +1,5 @@
-use starknet::ContractAddress;
 use contracts::structs::piggystructs::Asset;
+use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IPiggyStark<TContractState> {
@@ -8,3 +8,5 @@ pub trait IPiggyStark<TContractState> {
     fn get_user_assets(self: @TContractState) -> Array<Asset>;
     fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256;
 }
+
+
