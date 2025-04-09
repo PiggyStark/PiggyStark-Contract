@@ -15,7 +15,7 @@ pub mod PiggyStark {
         // deposited_token: Map::<ContractAddress, ContractAddress>,
         // Mapping from (user address, token address) to deposit amount
         deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
-        balance: Map<ContractAddress, u256
+        balance: Map<ContractAddress, u256>
         // deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
 
     }
@@ -38,4 +38,3 @@ pub mod PiggyStark {
         }
     }
 }
-//
