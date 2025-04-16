@@ -6,21 +6,22 @@ pub mod PiggyStark {
     use core::num::traits::Zero;
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-        Vec, VecTrait,
+        Vec, VecTrait, StorageMapReadAccess, StorageMapWriteAccess
     };
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
 
     #[storage]
     struct Storage {
-        owner: ContractAddress,
-        // Mapping from user address to the token address they deposited
-        user_deposits: Map<
-            ContractAddress, Map<ContractAddress, u256>,
-        > // Map user address to a nested map of token address -> token amount
-        //    locked_funds: Map::<ContractAddress, Vec<(ContractAddress, u256)>>,
-    // deposited_token: Map::<ContractAddress, ContractAddress>,
-    // Mapping from (user address, token address) to deposit amount
-    // deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
+
+       owner: ContractAddress,
+       // Mapping from user address to the token address they deposited
+       user_deposits: Map::<ContractAddress, Vec<(ContractAddress, u256)>>, // Map user address to a Vec of token address, token amount pair
+    //    locked_funds: Map::<ContractAddress, Vec<(ContractAddress, u256)>>,
+        // deposited_token: Map::<ContractAddress, ContractAddress>,
+        // Mapping from (user address, token address) to deposit amount
+        deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
+        balance: Map<ContractAddress, u256>,
+        // deposit_values: Map::<(ContractAddress, ContractAddress), u256>,
 
     }
 
@@ -88,6 +89,8 @@ pub mod PiggyStark {
         }
 
 
-        fn get_token_balance(self: @ContractState, token_address: ContractAddress) {}
+        fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
+            self.balance.read(token_address)
+        }
     }
 }
