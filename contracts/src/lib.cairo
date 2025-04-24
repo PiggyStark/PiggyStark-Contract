@@ -7,4 +7,6 @@ pub mod structs {
     pub mod piggystructs;
 }
 
-pub mod piggystark;
+pub mod contractss {
+    pub mod piggystark;
+}
