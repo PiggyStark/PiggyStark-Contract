@@ -6,16 +6,17 @@ pub mod PiggyStark {
     use core::num::traits::Zero;
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-        Vec, VecTrait
+        Vec, VecTrait,
     };
     use starknet::{ContractAddress, get_caller_address, get_contract_address};
 
     #[storage]
     struct Storage {
-
         owner: ContractAddress,
-        user_deposits: Map::<ContractAddress, Map::<ContractAddress, Option<Asset>>>, // Map user address to a Map of token address, (option) token amount key-value
-        deposited_tokens: Vec<ContractAddress>
+        user_deposits: Map::<
+            ContractAddress, Map<ContractAddress, Option<Asset>>,
+        >, // Map user address to a Map of token address, (option) token amount key-value
+        deposited_tokens: Vec<ContractAddress>,
     }
 
     #[event]
@@ -57,7 +58,7 @@ pub mod PiggyStark {
             let new_asset = Asset {
                 token_name: prev_asset.token_name,
                 token_address: prev_asset.token_address,
-                balance: prev_asset.balance + amount
+                balance: prev_asset.balance + amount,
             };
             self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
             self.deposited_tokens.append().write(token_address);
@@ -88,7 +89,11 @@ pub mod PiggyStark {
 
             for i in 0..self.deposited_tokens.len() {
                 let token_address = self.deposited_tokens.at(i).read();
-                let current_user_possesses = self.user_deposits.entry(caller).entry(token_address).read();
+                let current_user_possesses = self
+                    .user_deposits
+                    .entry(caller)
+                    .entry(token_address)
+                    .read();
                 assert(current_user_possesses.is_some(), 'Not owned by user');
                 let user_asset = current_user_possesses.unwrap();
                 assets.append(user_asset);
