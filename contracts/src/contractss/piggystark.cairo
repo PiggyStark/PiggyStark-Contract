@@ -40,9 +40,7 @@ pub mod PiggyStark {
 
     #[abi(embed_v0)]
     impl PiggyStarkImpl of IPiggyStark<ContractState> {
-        fn deposit(
-            ref self: ContractState, token_address: ContractAddress, amount: u256,
-        ) -> SuccessfulDeposit {
+        fn deposit(ref self: ContractState, token_address: ContractAddress, amount: u256) {
             assert(token_address.is_non_zero(), 'Token address cannot be zero');
             assert(amount > 0, 'Token amount cannot be zero');
 
@@ -85,7 +83,6 @@ pub mod PiggyStark {
             //self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
             //self.deposited_tokens.append().write(token_address);
             self.emit(SuccessfulDeposit { caller, token: token_address, amount });
-            SuccessfulDeposit { caller, token: token_address, amount }
         }
 
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {
@@ -97,10 +94,6 @@ pub mod PiggyStark {
             let contract = get_contract_address();
             assert(user_asset.balance >= amount, 'Amount overflows balance');
 
-            // Transfer tokens from contract to user
-            IERC20Dispatcher { contract_address: token_address }
-                .transfer_from(contract, caller, amount);
-
             user_asset.balance = user_asset.balance - amount;
             self.user_deposits.entry(caller).entry(token_address).write(Option::Some(user_asset));
         }
@@ -109,7 +102,7 @@ pub mod PiggyStark {
         fn get_user_assets(self: @ContractState) -> Array<Asset> {
             let caller = get_caller_address();
             let mut assets = ArrayTrait::new();
-
+            assert(self.deposited_tokens.len() > 0, 'no token availabe');
             for i in 0..self.deposited_tokens.len() {
                 let token_address = self.deposited_tokens.at(i).read();
                 let current_user_possesses = self
