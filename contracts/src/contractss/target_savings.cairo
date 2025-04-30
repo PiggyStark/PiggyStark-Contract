@@ -5,8 +5,8 @@ pub mod TargetSavings {
     use contracts::structs::target_savings_structs::SavingsGoal;
     use core::num::traits::Zero;
     use starknet::storage::{
-        Map, StoragePointerReadAccess, StoragePointerWriteAccess,
-        StorageMapReadAccess, StorageMapWriteAccess,
+        Map, StoragePointerReadAccess, StoragePointerWriteAccess, StorageMapReadAccess,
+        StorageMapWriteAccess,
     };
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
 
@@ -245,7 +245,8 @@ pub mod TargetSavings {
             // Withdraw all funds if any
             if goal.current_amount > 0 {
                 let _contract_address = get_contract_address();
-                IERC20Dispatcher { contract_address: goal.token_address }.transfer(caller, goal.current_amount);
+                IERC20Dispatcher { contract_address: goal.token_address }
+                    .transfer(caller, goal.current_amount);
             }
 
             // Deactivate goal
@@ -328,7 +329,8 @@ pub mod TargetSavings {
 
             // Transfer tokens from contract to user
             let _contract_address = get_contract_address();
-            IERC20Dispatcher { contract_address: goal.token_address }.transfer(caller, withdrawal_amount);
+            IERC20Dispatcher { contract_address: goal.token_address }
+                .transfer(caller, withdrawal_amount);
 
             // Update goal
             goal.current_amount = goal.current_amount - amount;

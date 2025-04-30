@@ -25,7 +25,7 @@ pub mod PiggyStark {
         SuccessfulDeposit: SuccessfulDeposit,
     }
 
-    #[derive(Drop, starknet::Event)]
+    #[derive(Drop, Serde, starknet::Event)]
     pub struct SuccessfulDeposit {
         pub caller: ContractAddress,
         pub token: ContractAddress,
@@ -40,29 +40,52 @@ pub mod PiggyStark {
 
     #[abi(embed_v0)]
     impl PiggyStarkImpl of IPiggyStark<ContractState> {
-        fn deposit(ref self: ContractState, token_address: ContractAddress, amount: u256) {
+        fn deposit(
+            ref self: ContractState, token_address: ContractAddress, amount: u256,
+        ) -> SuccessfulDeposit {
             assert(token_address.is_non_zero(), 'Token address cannot be zero');
             assert(amount > 0, 'Token amount cannot be zero');
 
             let caller = get_caller_address();
             let contract = get_contract_address();
-
             // Transfer tokens from user to contract
-            IERC20Dispatcher { contract_address: token_address }
-                .transfer_from(caller, contract, amount);
+            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
+            token_dispatcher.transfer_from(caller, contract, amount);
 
             // Update user deposit balance
             let prev_asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
-            assert(prev_asset_ref.is_some(), 'User does not possess token');
-            let prev_asset = prev_asset_ref.unwrap();
-            let new_asset = Asset {
-                token_name: prev_asset.token_name,
-                token_address: prev_asset.token_address,
-                balance: prev_asset.balance + amount,
-            };
-            self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
-            self.deposited_tokens.append().write(token_address);
+            // Handle both new and existing deposits
+            if prev_asset_ref.is_some() {
+                // User has deposited this token before, update the balance
+                let prev_asset = prev_asset_ref.unwrap();
+                let new_asset = Asset {
+                    token_name: prev_asset.token_name,
+                    token_address: prev_asset.token_address,
+                    balance: prev_asset.balance + amount,
+                };
+                self
+                    .user_deposits
+                    .entry(caller)
+                    .entry(token_address)
+                    .write(Option::Some(new_asset));
+            } else {
+                // This is the user's first deposit of this token, create a new record
+                let new_asset = Asset {
+                    token_name: 'STRK', token_address: token_address, balance: amount,
+                };
+                self
+                    .user_deposits
+                    .entry(caller)
+                    .entry(token_address)
+                    .write(Option::Some(new_asset));
+
+                // Add this token to the deposited tokens list if it's not already theredf
+                self.deposited_tokens.append().write(token_address);
+            }
+            //self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
+            //self.deposited_tokens.append().write(token_address);
             self.emit(SuccessfulDeposit { caller, token: token_address, amount });
+            SuccessfulDeposit { caller, token: token_address, amount }
         }
 
         fn withdraw(ref self: ContractState, token_address: ContractAddress, amount: u256) {
