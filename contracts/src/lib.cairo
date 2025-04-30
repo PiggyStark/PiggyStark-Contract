@@ -11,4 +11,5 @@ pub mod structs {
 pub mod contractss {
     pub mod piggystark;
     pub mod target_savings;
+    pub mod token;
 }

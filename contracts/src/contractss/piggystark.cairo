@@ -27,7 +27,7 @@ pub mod PiggyStark {
         AssetCreated: AssetCreated,
     }
 
-    #[derive(Drop, starknet::Event)]
+    #[derive(Drop, Serde, starknet::Event)]
     pub struct SuccessfulDeposit {
         pub caller: ContractAddress,
         pub token: ContractAddress,
@@ -49,7 +49,12 @@ pub mod PiggyStark {
 
     #[abi(embed_v0)]
     impl PiggyStarkImpl of IPiggyStark<ContractState> {
-        fn create_asset(ref self: ContractState, token_address: ContractAddress, amount: u256) {
+        fn create_asset(
+            ref self: ContractState,
+            token_address: ContractAddress,
+            amount: u256,
+            token_name: felt252,
+        ) {
             assert(token_address.is_non_zero(), 'Token address cannot be zero');
             assert(amount > 0, 'Token amount cannot be zero');
 
@@ -63,14 +68,14 @@ pub mod PiggyStark {
 
             erc20_dispatcher.transfer_from(caller, contract, amount);
 
-            let token_name: felt252 = erc20_dispatcher.get_name();
+            let transfer_success = erc20_dispatcher.balance_of(caller);
 
             // Create new asset
             let new_asset = Asset { token_name, token_address, balance: amount };
 
             self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
 
-            self.deposited_tokens.push(token_address);
+            self.deposited_tokens.append().write(token_address);
 
             self.emit(AssetCreated { caller, token: token_address, token_name, amount });
         }
@@ -81,10 +86,6 @@ pub mod PiggyStark {
 
             let caller = get_caller_address();
             let contract = get_contract_address();
-
-            // Transfer tokens from user to contract
-            IERC20Dispatcher { contract_address: token_address }
-                .transfer_from(caller, contract, amount);
 
             // Update user deposit balance
             let prev_asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
@@ -109,10 +110,6 @@ pub mod PiggyStark {
             let contract = get_contract_address();
             assert(user_asset.balance >= amount, 'Amount overflows balance');
 
-            // Transfer tokens from contract to user
-            IERC20Dispatcher { contract_address: token_address }
-                .transfer_from(contract, caller, amount);
-
             user_asset.balance = user_asset.balance - amount;
             self.user_deposits.entry(caller).entry(token_address).write(Option::Some(user_asset));
         }
@@ -121,7 +118,7 @@ pub mod PiggyStark {
         fn get_user_assets(self: @ContractState) -> Array<Asset> {
             let caller = get_caller_address();
             let mut assets = ArrayTrait::new();
-
+            assert(self.deposited_tokens.len() > 0, 'no token availabe');
             for i in 0..self.deposited_tokens.len() {
                 let token_address = self.deposited_tokens.at(i).read();
                 let current_user_possesses = self
@@ -132,7 +129,7 @@ pub mod PiggyStark {
                 assert(current_user_possesses.is_some(), 'Not owned by user');
                 let user_asset = current_user_possesses.unwrap();
                 assets.append(user_asset);
-            }
+            };
             assets
         }
 
