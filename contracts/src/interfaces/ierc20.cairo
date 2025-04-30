@@ -2,7 +2,7 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IERC20<TContractState> {
-    fn get_name(self: @TContractState) -> ByteArray;
+    fn get_name(self: @TContractState) -> felt252;
     fn get_symbol(self: @TContractState) -> ByteArray;
     fn get_decimals(self: @TContractState) -> u8;
 
