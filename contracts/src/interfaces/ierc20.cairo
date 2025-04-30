@@ -2,9 +2,9 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IERC20<TContractState> {
-    fn name(self: @TContractState) -> ByteArray;
-    fn symbol(self: @TContractState) -> ByteArray;
-    fn decimals(self: @TContractState) -> u8;
+    fn get_name(self: @TContractState) -> felt252;
+    fn get_symbol(self: @TContractState) -> ByteArray;
+    fn get_decimals(self: @TContractState) -> u8;
 
     fn total_supply(self: @TContractState) -> u256;
     fn balance_of(self: @TContractState, account: ContractAddress) -> u256;
