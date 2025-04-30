@@ -49,7 +49,12 @@ pub mod PiggyStark {
 
     #[abi(embed_v0)]
     impl PiggyStarkImpl of IPiggyStark<ContractState> {
-        fn create_asset(ref self: ContractState, token_address: ContractAddress, amount: u256) {
+        fn create_asset(
+            ref self: ContractState,
+            token_address: ContractAddress,
+            amount: u256,
+            token_name: felt252,
+        ) {
             assert(token_address.is_non_zero(), 'Token address cannot be zero');
             assert(amount > 0, 'Token amount cannot be zero');
 
@@ -63,14 +68,14 @@ pub mod PiggyStark {
 
             erc20_dispatcher.transfer_from(caller, contract, amount);
 
-            let token_name: felt252 = erc20_dispatcher.get_name();
+            let transfer_success = erc20_dispatcher.balance_of(caller);
 
             // Create new asset
             let new_asset = Asset { token_name, token_address, balance: amount };
 
             self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
 
-            self.deposited_tokens.push(token_address);
+            self.deposited_tokens.append().write(token_address);
 
             self.emit(AssetCreated { caller, token: token_address, token_name, amount });
         }
@@ -81,42 +86,18 @@ pub mod PiggyStark {
 
             let caller = get_caller_address();
             let contract = get_contract_address();
-            // Transfer tokens from user to contract
-            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
-            token_dispatcher.transfer_from(caller, contract, amount);
 
             // Update user deposit balance
             let prev_asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
-            // Handle both new and existing deposits
-            if prev_asset_ref.is_some() {
-                // User has deposited this token before, update the balance
-                let prev_asset = prev_asset_ref.unwrap();
-                let new_asset = Asset {
-                    token_name: prev_asset.token_name,
-                    token_address: prev_asset.token_address,
-                    balance: prev_asset.balance + amount,
-                };
-                self
-                    .user_deposits
-                    .entry(caller)
-                    .entry(token_address)
-                    .write(Option::Some(new_asset));
-            } else {
-                // This is the user's first deposit of this token, create a new record
-                let new_asset = Asset {
-                    token_name: 'STRK', token_address: token_address, balance: amount,
-                };
-                self
-                    .user_deposits
-                    .entry(caller)
-                    .entry(token_address)
-                    .write(Option::Some(new_asset));
-
-                // Add this token to the deposited tokens list if it's not already theredf
-                self.deposited_tokens.append().write(token_address);
-            }
-            //self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
-            //self.deposited_tokens.append().write(token_address);
+            assert(prev_asset_ref.is_some(), 'User does not possess token');
+            let prev_asset = prev_asset_ref.unwrap();
+            let new_asset = Asset {
+                token_name: prev_asset.token_name,
+                token_address: prev_asset.token_address,
+                balance: prev_asset.balance + amount,
+            };
+            self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
+            self.deposited_tokens.append().write(token_address);
             self.emit(SuccessfulDeposit { caller, token: token_address, amount });
         }
 
@@ -148,7 +129,7 @@ pub mod PiggyStark {
                 assert(current_user_possesses.is_some(), 'Not owned by user');
                 let user_asset = current_user_possesses.unwrap();
                 assets.append(user_asset);
-            }
+            };
             assets
         }
 

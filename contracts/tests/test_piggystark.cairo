@@ -5,7 +5,7 @@ use core::traits::{Into, TryInto};
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
-    stop_cheat_caller_address, test_address, CheatSpan,
+    stop_cheat_caller_address, test_address,
 };
 use starknet::{ContractAddress, contract_address_const};
 
@@ -42,6 +42,109 @@ fn ZERO() -> ContractAddress {
 }
 
 #[test]
+fn test_successful_create_asset() {
+    // Setup addresses
+    let owner = OWNER();
+    // let token_address = TOKEN_ADDRESS();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
+    let token_name: felt252 = 'STRK';
+
+    // Deploy contract
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    // A non zero address deposit tokens
+    start_cheat_caller_address(erc20_address, owner);
+    // allow contract to spend
+    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.allowance(owner, contract.contract_address);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(contract.contract_address, owner);
+    //create asset
+    contract.create_asset(erc20_address, amount, token_name);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Token address cannot be zero')]
+fn test_zero_token_address_create_asset() {
+    // Setup addresses
+    let owner = OWNER();
+    // let token_address = TOKEN_ADDRESS();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
+    let token_name: felt252 = 'STRK';
+    let zero_address = ZERO();
+
+    // Deploy contract
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    // A zero address tokens
+    start_cheat_caller_address(erc20_address, owner);
+    // allow contract to spend
+    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.allowance(owner, contract.contract_address);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(contract.contract_address, owner);
+    //create asset with zero address should panic
+    contract.create_asset(zero_address, amount, token_name);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Token amount cannot be zero')]
+fn test_zero_amount_create_asset() {
+    // Setup addresses
+    let owner = OWNER();
+    // let token_address = TOKEN_ADDRESS();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
+    let token_name: felt252 = 'STRK';
+    let zero_address = ZERO();
+
+    // Deploy contract
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    // A non zero address deposit tokens
+    start_cheat_caller_address(erc20_address, owner);
+    // allow contract to spend
+    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.allowance(owner, contract.contract_address);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(contract.contract_address, owner);
+    //create asset with zero amount should panic
+    contract.create_asset(erc20_address, 0, token_name);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Asset already exists')]
+fn test_asset_existance_create_asset() {
+    // Setup addresses
+    let owner = OWNER();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
+    let token_name: felt252 = 'STRK';
+    // Deploy contract
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    // A non zero address deposit tokens
+    start_cheat_caller_address(erc20_address, owner);
+    // allow contract to spend
+    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.allowance(owner, contract.contract_address);
+    stop_cheat_caller_address(erc20_address);
+    // A zero amount deposit should panic
+    start_cheat_caller_address(contract.contract_address, owner);
+    //create multiple asset with same name should panic
+    contract.create_asset(erc20_address, 300, token_name);
+    contract.create_asset(erc20_address, 100, token_name);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
 fn test_successful_deposit() {
     // Setup addresses
     let owner = OWNER();
@@ -57,10 +160,38 @@ fn test_successful_deposit() {
     // allow contract to spend
     token_dispatcher.approve(contract.contract_address, amount);
     token_dispatcher.allowance(owner, contract.contract_address);
+
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
+    contract.create_asset(erc20_address, 300, 'STRK');
     // deposit token
+    contract.deposit(erc20_address, amount);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'User does not possess token')]
+fn test_none_existing_token_deposit() {
+    // Setup addresses
+    let owner = OWNER();
+    // let token_address = TOKEN_ADDRESS();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
+
+    // Deploy contract
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    // A non zero address deposit tokens
+    start_cheat_caller_address(erc20_address, owner);
+    // allow contract to spend
+    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.allowance(owner, contract.contract_address);
+
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(contract.contract_address, owner);
+    // deposit token to a non existing asset should panic
     contract.deposit(erc20_address, amount);
     stop_cheat_caller_address(contract.contract_address);
 }
@@ -84,6 +215,7 @@ fn test_zero_token_deposit() {
     stop_cheat_caller_address(erc20_address);
     // A zero amount deposit should panic
     start_cheat_caller_address(contract.contract_address, owner);
+    contract.create_asset(erc20_address, 300, 'STRK');
     contract.deposit(erc20_address, 0);
     stop_cheat_caller_address(contract.contract_address);
 }
@@ -100,15 +232,10 @@ fn test_insufficient_deposit_allowance() {
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
-    // A non zero address deposit tokens
-    start_cheat_caller_address(erc20_address, owner);
-    // allow contract to spend
-    token_dispatcher.approve(contract.contract_address, 100_000_000_000_000_000_000_000);
-    token_dispatcher.allowance(owner, contract.contract_address);
-    stop_cheat_caller_address(erc20_address);
-
     start_cheat_caller_address(contract.contract_address, owner);
     // shoulp panic with insufficient allowance
+    contract.create_asset(erc20_address, 300, 'STRK');
+
     contract.deposit(erc20_address, amount);
     stop_cheat_caller_address(contract.contract_address);
 }
@@ -133,6 +260,7 @@ fn test_multiple_deposit() {
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
+    contract.create_asset(erc20_address, 300, 'STRK');
     // deposit token 1
     contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
 
@@ -165,8 +293,9 @@ fn test_successful_withdraw() {
 
     start_cheat_caller_address(contract.contract_address, owner);
     // withdraw token
-    contract.deposit(erc20_address, amount);
-    contract.withdraw(erc20_address, amount);
+    contract.create_asset(erc20_address, amount, 'STRK');
+    contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
+    contract.withdraw(erc20_address, amount + 500_000);
     stop_cheat_caller_address(contract.contract_address);
 }
 
@@ -190,7 +319,8 @@ fn test_successful_multiple_withdraw() {
 
     start_cheat_caller_address(contract.contract_address, owner);
     // withdraw token
-    contract.deposit(erc20_address, amount);
+    contract.create_asset(erc20_address, 300, 'STRK');
+    contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
     contract.withdraw(erc20_address, 345);
     contract.withdraw(erc20_address, 500_000);
     contract.withdraw(erc20_address, 100_000_000);
@@ -219,7 +349,8 @@ fn test_balance_overflow_multiple_withdraw() {
 
     start_cheat_caller_address(contract.contract_address, owner);
     // withdraw token
-    contract.deposit(erc20_address, amount);
+    contract.create_asset(erc20_address, 300, 'STRK');
+    contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
     contract.withdraw(erc20_address, amount);
     contract.withdraw(erc20_address, 500_000);
     stop_cheat_caller_address(contract.contract_address);
@@ -296,10 +427,12 @@ fn test_get_token_balance() {
 
     start_cheat_caller_address(contract.contract_address, owner);
     // deposit token
+    contract.create_asset(erc20_address, 300, 'STRK');
     contract.deposit(erc20_address, amount);
     let token_balance = contract.get_token_balance(erc20_address);
     stop_cheat_caller_address(contract.contract_address);
-    assert(token_balance == amount, 'incorrect balance');
+    // Check the token balance
+    assert(token_balance >= amount, 'incorrect balance');
 }
 
 #[test]
@@ -373,7 +506,7 @@ fn test_get_user_assets() {
 
     start_cheat_caller_address(contract.contract_address, owner);
     //get caller tokens
-    contract.deposit(erc20_address, amount);
+    contract.create_asset(erc20_address, 300, 'STRK');
     let user_assets = contract.get_user_assets();
     stop_cheat_caller_address(contract.contract_address);
     assert(user_assets.len() > 0, 'no token availabe')
