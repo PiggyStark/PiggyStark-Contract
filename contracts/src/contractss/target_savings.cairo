@@ -89,7 +89,7 @@ pub mod TargetSavings {
 
     // Define the interface inline
     #[starknet::interface]
-    trait ITargetSavings<T> {
+    pub trait ITargetSavings<T> {
         // Goal management
         fn create_goal(
             ref self: T,
