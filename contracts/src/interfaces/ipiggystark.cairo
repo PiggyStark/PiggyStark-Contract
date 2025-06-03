@@ -3,34 +3,9 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IPiggyStark<TContractState> {
-    // === Admin Functions ===
-    // These functions are restricted to the contract admin for managing supported assets and protocol integrations.
-
-    /// Adds a new ERC20 token to the list of supported assets.
-    /// Only callable by the admin to ensure only vetted tokens (e.g., ETH, USDC) are used.
-    /// Emits an AssetAdded event (defined in the contract implementation).
-    /// @param asset The address of the ERC20 token contract to support.
-    // fn add_supported_asset(ref self: TContractState, asset: ContractAddress);
-
-    /// Updates the address of the Nostra lending protocol contract.
-    /// Allows the admin to update the integration if Nostra deploys a new contract version.
-    /// @param new_address The new address of the Nostra contract.
-    // fn update_nostra_contract(ref self: TContractState, new_address: ContractAddress);
-
-    /// Updates the address of the AVNU trading/liquidity protocol contract.
-    /// Allows the admin to update the integration if AVNU deploys a new contract version.
-    /// @param new_address The new address of the AVNU contract.
-    // fn update_avnu_contract(ref self: TContractState, new_address: ContractAddress);
-
-    // === Savings Functions ===
-    // These functions handle flexible and locked savings, mimicking PiggyVest’s Flex Naira and Safelock.
-
-    /// Deposits an amount of a supported token into the user’s flexible savings wallet.
-    /// Tokens are transferred from the user’s StarkNet wallet to the contract via ERC20 transfer_from.
-    /// Funds may be allocated to Nostra for yield generation (e.g., lending/staking).
-    /// Emits a Deposit event.
-    /// @param token_address The address of the ERC20 token to deposit (must be supported).
-    /// @param amount The amount of tokens to deposit (must be > 0).
+    fn create_asset(
+        ref self: TContractState, token_address: ContractAddress, amount: u256, token_name: felt252,
+    );
     fn deposit(ref self: TContractState, token_address: ContractAddress, amount: u256);
 
     /// Withdraws an amount of a supported token from the user’s flexible savings wallet.
