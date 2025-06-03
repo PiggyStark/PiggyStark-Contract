@@ -1,8 +1,9 @@
-use contracts::contractss::target_savings::TargetSavings::{
-    Event, GoalCreated, ITargetSavingsDispatcher, ITargetSavingsDispatcherTrait, GoalEdited,
+use piggystark::contracts::target_savings::TargetSavings::{
+    Event, GoalCreated, GoalEdited,
     GoalDeleted, FundsDeposited, FundsWithdrawn, FundsWithdrawnWithPenalty,
 };
-use contracts::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+use piggystark::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+use piggystark::interfaces::itargetsavings::{ITargetSavingsDispatcher, ITargetSavingsDispatcherTrait};
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
     cheat_block_timestamp, cheat_caller_address, declare, spy_events,
@@ -16,12 +17,6 @@ fn OWNER() -> ContractAddress {
 fn USER() -> ContractAddress {
     contract_address_const::<'USER'>()
 }
-
-//     fn withdraw_with_penalty(ref self: T, goal_id: u64, amount: u256);
-//     fn get_goal_progress(self: @T, goal_id: u64) -> (u256, u256);
-//     fn is_goal_reached(self: @T, goal_id: u64) -> bool;
-//     fn is_goal_deadline_passed(self: @T, goal_id: u64) -> bool;
-// }
 
 fn deploy() -> ITargetSavingsDispatcher {
     let mut calldata = array![];
@@ -174,16 +169,6 @@ fn test_target_savings_delete_goal_refund_success() {
     dispatcher.delete_goal(goal_id);
     assert(token.balance_of(USER()) == deposit, 'REFUND FAILED');
 }
-// pub struct SavingsGoal {
-//     pub id: u64,
-//     pub owner: ContractAddress,
-//     pub token_address: ContractAddress,
-//     pub target_amount: u256,
-//     pub current_amount: u256,
-//     pub deadline: u64,
-//     pub name: felt252,
-//     pub active: bool,
-// }
 
 //     fn withdraw_with_penalty(ref self: T, goal_id: u64, amount: u256);
 #[test]
