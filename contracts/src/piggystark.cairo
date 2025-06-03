@@ -58,8 +58,9 @@ pub mod PiggyStark {
                 .transfer_from(caller, contract, amount);
 
             // Update user deposit balance
-            let prev_deposit = self.user_deposits.entry(caller).entry(token_address).read();
-            self.user_deposits.entry(caller).entry(token_address).write(prev_deposit + amount);
+            let mut deposits = self.user_deposits.entry(caller).read();
+            deposits.append((token_address, amount));
+            self.user_deposits.entry(caller).write(deposits);
 
             self.emit(SuccessfulDeposit { caller, token: token_address, amount });
         }
@@ -88,9 +89,5 @@ pub mod PiggyStark {
             assets
         }
 
-
-        fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
-            self.balance.read(token_address)
-        }
     }
 }
