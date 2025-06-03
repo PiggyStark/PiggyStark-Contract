@@ -29,19 +29,20 @@ pub trait IPiggyStark<TContractState> {
     /// Funds are moved from the flexible balance to a locked state and may be allocated to Nostra.
     /// Emits a Locked event.
     /// @param token_address The address of the ERC20 token to lock.
-    /// @param amount The amount of tokens to lock (must be <= user’s flexible balance).
+    /// @param amount The amount of tokens to lock (must be <= user's flexible balance).
     /// @param lock_duration The duration (in seconds) for which funds are locked.
-    // fn lock_savings(ref self: TContractState, token_address: ContractAddress, amount: u256, lock_duration: u64);
+    /// @return The unique ID of the created lock.
+    // fn lock_savings(ref self: TContractState, token_address: ContractAddress, amount: u256, lock_duration: u64) -> u64;
 
     /// Unlocks and releases funds from a specific lock once the lock duration has expired.
     /// Funds are moved back to the user’s flexible balance and withdrawn from Nostra if applicable.
     /// Emits an Unlocked event.
     /// @param token_address The address of the ERC20 token to unlock.
-    /// @param lock_id The unique ID of the lock to release.
+    /// @param lock_id The unique ID of the lock to release. This ID is returned when calling lock_savings().
     // fn unlock_savings(ref self: TContractState, token_address: ContractAddress, lock_id: u64);
 
     // === Target Savings Functions ===
-    // These functions support goal-based savings, similar to PiggyVest’s Target Savings.
+    // These functions support goal-based savings.
 
     /// Creates a new savings target with a goal amount and deadline.
     /// Allows users to save toward a specific financial goal, with funds optionally allocated to Nostra.
@@ -49,7 +50,8 @@ pub trait IPiggyStark<TContractState> {
     /// @param token_address The address of the ERC20 token for the target.
     /// @param goal The target amount to save (must be > 0).
     /// @param deadline The timestamp (in seconds) when the target expires.
-    // fn create_target(ref self: TContractState, token_address: ContractAddress, goal: u256, deadline: u64);
+    /// @return The unique ID of the created target.
+    // fn create_target(ref self: TContractState, token_address: ContractAddress, goal: u256, deadline: u64) -> u64;
 
     /// Contributes an amount to an existing savings target.
     /// Funds are moved from the flexible balance to the target and may be allocated to Nostra.
