@@ -1,11 +1,21 @@
-use contracts::structs::piggystructs::Asset;
+// use piggystark::structs::piggystructs::Asset;
 use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IPiggyStark<TContractState> {
-    fn create_asset(
-        ref self: TContractState, token_address: ContractAddress, amount: u256, token_name: felt252,
-    );
+    /// Creates a new asset entry in the user's portfolio with specified token details.
+    /// This function initializes a new asset tracking entry for a supported token.
+    /// Emits an AssetCreated event.
+    /// @param token_address The address of the ERC20 token to create an asset for.
+    /// @param amount The initial amount of tokens for this asset (must be > 0).
+    /// @param token_name The name/symbol of the token to display in the UI.
+    fn create_asset( ref self: TContractState, token_address: ContractAddress, amount: u256, token_name: felt252);
+
+    /// Deposits tokens into the user's flexible savings wallet.
+    /// Tokens are transferred from the user's wallet to the contract.
+    /// Emits a SuccessfulDeposit event.
+    /// @param token_address The address of the ERC20 token to deposit.
+    /// @param amount The amount of tokens to deposit (must be > 0).
     fn deposit(ref self: TContractState, token_address: ContractAddress, amount: u256);
 
     /// Withdraws an amount of a supported token from the user’s flexible savings wallet.
@@ -100,5 +110,11 @@ pub trait IPiggyStark<TContractState> {
     /// Aggregates flexible, locked, and target savings balances for a comprehensive view.
     /// Useful for displaying a user’s portfolio in the frontend.
     /// @return An array of Asset structs containing token addresses and balances.
-    fn get_user_assets(self: @TContractState) -> Array<Asset>;
+    // fn get_user_assets(self: @TContractState) -> Array<Asset>;
+
+    /// Returns the balance of a specific token for the user.
+    /// Useful for displaying the balance of a specific token in the frontend.
+    /// @param token_address The address of the ERC20 token.
+    /// @return The balance of the token.
+    fn get_token_balance(self: @TContractState, token_address: ContractAddress) -> u256;
 }
