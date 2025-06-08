@@ -7,10 +7,16 @@ use snforge_std::{
     stop_cheat_caller_address, test_address,
 };
 use starknet::{ContractAddress, contract_address_const};
+use piggystark::contracts::piggystark::PiggyStark::{
+    Event, SuccessfulDeposit, AssetCreated, Withdrawal, Locked, Unlocked,
+};
+// use snforge_std::{
+//     CheatSpan, EventSpyAssertionsTrait, cheat_block_timestamp, cheat_caller_address, spy_events,
+// };
 
 fn setup(owner: ContractAddress) -> (IPiggyStarkDispatcher, ContractAddress) {
     // Deploy mock ERC20
-    let erc20_class = declare("STRK").unwrap().contract_class();
+    let erc20_class = declare("STARKTOKEN").unwrap().contract_class();
     let mut calldata = array![owner.into(), owner.into(), 18];
     let (erc20_address, _) = erc20_class.deploy(@calldata).unwrap();
 
@@ -132,12 +138,13 @@ fn test_successful_deposit() {
 
     start_cheat_caller_address(erc20_address, owner);
     token_dispatcher.approve(contract.contract_address, amount);
-    token_dispatcher.allowance(owner, contract.contract_address);
+    let allowance = token_dispatcher.allowance(owner, contract.contract_address);
+    assert(allowance == amount, 'Allowance not set correctly');
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, 300, 'STRK');
-    contract.deposit(erc20_address, amount);
+    contract.create_asset(erc20_address, 100, 'STRK');
+    contract.deposit(erc20_address, (amount/2));
     stop_cheat_caller_address(contract.contract_address);
 }
 
@@ -231,9 +238,15 @@ fn test_successful_withdraw() {
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, amount, 'STRK');
+    contract.create_asset(erc20_address, 800, 'STRK');
     contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
-    contract.withdraw(erc20_address, amount + 500_000);
+
+    // // Need to approve the contract to transfer back during withdraw
+    // start_cheat_caller_address(erc20_address, owner);
+    // token_dispatcher.approve(contract.contract_address, amount);
+    // stop_cheat_caller_address(erc20_address);
+    
+    contract.withdraw(erc20_address, 500_000);
     stop_cheat_caller_address(contract.contract_address);
 }
 
@@ -325,6 +338,7 @@ fn test_withdraw_from_Zero_caller_address() {
 fn test_get_token_balance() {
     let owner = OWNER();
     let amount: u256 = 200_000_000_000_000_000_000_000;
+    let deposit_amount: u256 = amount / 2;
 
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
@@ -336,15 +350,17 @@ fn test_get_token_balance() {
 
     start_cheat_caller_address(contract.contract_address, owner);
     contract.create_asset(erc20_address, 300, 'STRK');
-    contract.deposit(erc20_address, amount);
+    contract.deposit(erc20_address, deposit_amount);
     let token_balance = contract.get_token_balance(erc20_address);
     stop_cheat_caller_address(contract.contract_address);
-    assert(token_balance >= amount, ERRORS().INCORRECT_BALANCE);
+
+    let expected_balance = deposit_amount + 300;
+    assert(token_balance == expected_balance, ERRORS().INCORRECT_BALANCE);
 }
 
 #[test]
 #[should_panic(expected: 'User does not possess token')]
-fn test_get_token_balance_for_none_exixt_user_token() {
+fn test_get_token_balance_for_none_exist_user_token() {
     let owner = OWNER();
     let amount: u256 = 200_000_000_000_000_000_000_000;
 
