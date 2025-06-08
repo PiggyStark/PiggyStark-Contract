@@ -12,6 +12,8 @@ pub mod Errors {
         pub NO_TOKENS_AVAILABLE: felt252,
         pub SHOULD_HAVE_NO_TOKENS: felt252,
         pub INCORRECT_BALANCE: felt252,
+        pub ZERO_USER_ADDRESS: felt252,
+        pub ZERO_LOCK_ID: felt252,
     }
 
     pub fn new() -> Errors {
@@ -27,6 +29,8 @@ pub mod Errors {
             NO_TOKENS_AVAILABLE: 'no tokens available',
             SHOULD_HAVE_NO_TOKENS: 'should have no tokens',
             INCORRECT_BALANCE: 'incorrect balance',
+            ZERO_USER_ADDRESS: 'user address cannot be zero',
+            ZERO_LOCK_ID: 'lock id cannot be zero',
         }
     }
 }
