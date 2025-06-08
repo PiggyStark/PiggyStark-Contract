@@ -119,4 +119,5 @@ pub trait IPiggyStark<TContractState> {
     /// @param token_address The address of the ERC20 token.
     /// @return The balance of the token.
     fn get_token_balance(self: @TContractState, token_address: ContractAddress) -> u256;
+    fn get_balance(self: @TContractState, user: ContractAddress, token_address: ContractAddress) -> u256;
 }
