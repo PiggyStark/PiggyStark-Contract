@@ -153,6 +153,16 @@ pub mod PiggyStark {
                 Option::None => 0
             }
         }
+
+
+        fn get_balance(self: @ContractState, user: ContractAddress, token_address: ContractAddress) -> u256 {
+            let asset_ref = self.user_deposits.entry(user).entry(token_address).read();
+            
+            match asset_ref {
+                Option::Some(asset) => asset.balance,
+                Option::None => 0
+            }
+        }
     }
 }
             
