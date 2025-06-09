@@ -2,7 +2,7 @@
 pub mod PiggyStark {
     use piggystark::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use piggystark::interfaces::ipiggystark::IPiggyStark;
-    use piggystark::structs::piggystructs::Asset;
+    use piggystark::structs::piggystructs::{Asset, SavingsTarget};
     use piggystark::errors::piggystark_errors::Errors;
     use core::num::traits::Zero;
     use starknet::event::EventEmitter;
@@ -10,7 +10,7 @@ pub mod PiggyStark {
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
         Vec, VecTrait,
     };
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
 
     #[storage]
     struct Storage {
@@ -18,6 +18,8 @@ pub mod PiggyStark {
         user_deposits: Map<ContractAddress, Map<ContractAddress, Option<Asset>>>, // Map user address to a Map of token address, (option) token amount key-value
         deposited_tokens: Vec<ContractAddress>,
         balance: Map<ContractAddress, u256>, // Track total balance per token
+        targets_count: u64, // Total created targets, used to assign new IDs
+        targets: Map<u64, SavingsTarget> // Map SavingsTarget to its target ID
     }
 
     #[event]
@@ -26,6 +28,7 @@ pub mod PiggyStark {
         SuccessfulDeposit: SuccessfulDeposit,
         AssetCreated: AssetCreated,
         Withdrawal: Withdrawal,
+        TargetCreated: TargetCreated,
     }
 
     #[derive(Drop, Serde, starknet::Event)]
@@ -48,6 +51,14 @@ pub mod PiggyStark {
         pub caller: ContractAddress,
         pub token: ContractAddress,
         pub amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct TargetCreated {
+        pub caller: ContractAddress,
+        pub token: ContractAddress,
+        pub goal: u256,
+        pub deadline: u64,
     }
 
     #[constructor]
@@ -109,7 +120,7 @@ pub mod PiggyStark {
             // Update total balance
             let current_balance = self.balance.entry(token_address).read();
             self.balance.entry(token_address).write(current_balance + amount);
-            
+
             self.emit(SuccessfulDeposit { caller, token: token_address, amount });
         }
 
@@ -144,10 +155,36 @@ pub mod PiggyStark {
             self.emit(Withdrawal { caller, token: token_address, amount });
         }
 
+        fn create_target(
+            ref self: ContractState, token_address: ContractAddress, goal: u256, deadline: u64,
+        ) -> u64 {
+            let errors = Errors::new();
+            assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
+            assert(goal > 0, errors.ZERO_GOAL_AMOUNT);
+
+            let current_time = get_block_timestamp();
+            assert(deadline > current_time, errors.INVALID_DEADLINE);
+
+            let target_id = self.targets_count.read() + 1;
+            self.targets_count.write(target_id);
+
+            let new_target = SavingsTarget { id: target_id, token_address, goal, deadline };
+            self.targets.entry(target_id).write(new_target);
+
+            self
+                .emit(
+                    TargetCreated {
+                        caller: get_caller_address(), token: token_address, goal, deadline,
+                    },
+                );
+
+            target_id
+        }
+
         fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
             let caller = get_caller_address();
             let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
-            
+
             match asset_ref {
                 Option::Some(asset) => asset.balance,
                 Option::None => 0
@@ -155,4 +192,3 @@ pub mod PiggyStark {
         }
     }
 }
-            

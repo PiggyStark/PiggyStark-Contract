@@ -51,7 +51,9 @@ pub trait IPiggyStark<TContractState> {
     /// @param goal The target amount to save (must be > 0).
     /// @param deadline The timestamp (in seconds) when the target expires.
     /// @return The unique ID of the created target.
-    // fn create_target(ref self: TContractState, token_address: ContractAddress, goal: u256, deadline: u64) -> u64;
+    fn create_target(
+        ref self: TContractState, token_address: ContractAddress, goal: u256, deadline: u64,
+    ) -> u64;
 
     /// Contributes an amount to an existing savings target.
     /// Funds are moved from the flexible balance to the target and may be allocated to Nostra.
