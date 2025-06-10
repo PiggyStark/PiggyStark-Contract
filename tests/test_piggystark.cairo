@@ -1,12 +1,13 @@
 use piggystark::interfaces::ipiggystark::{IPiggyStarkDispatcher, IPiggyStarkDispatcherTrait};
+use piggystark::contracts::piggystark::PiggyStark::{Event, TargetCreated};
 use core::traits::{Into, TryInto};
 
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use snforge_std::{
-    ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
-    stop_cheat_caller_address, test_address,
+    ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events,
+    start_cheat_caller_address, stop_cheat_caller_address, test_address,
 };
-use starknet::{ContractAddress, contract_address_const};
+use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
 
 fn setup(owner: ContractAddress) -> (IPiggyStarkDispatcher, ContractAddress) {
     // Deploy mock ERC20
@@ -20,7 +21,7 @@ fn setup(owner: ContractAddress) -> (IPiggyStarkDispatcher, ContractAddress) {
     (dispatcher, erc20_address)
 }
 
-// Utility functions 
+// Utility functions
 fn OWNER() -> ContractAddress {
     contract_address_const::<'OWNER'>()
 }
@@ -419,3 +420,98 @@ fn test_get_token_balance_from_Zero_caller_address() {
 //     stop_cheat_caller_address(contract.contract_address);
 //     assert(user_assets.len() == 0, ERRORS().SHOULD_HAVE_NO_TOKENS);
 // }
+
+#[test]
+fn test_create_target_success() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+
+    let class = declare("PiggyStark").unwrap().contract_class();
+    let (addr, _) = class.deploy(@array![owner.into()]).unwrap();
+    let dispatcher = IPiggyStarkDispatcher { contract_address: addr };
+
+    let token = TOKEN_ADDRESS();
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 10;
+
+    // Create first target
+    start_cheat_caller_address(addr, user);
+    let mut spy = spy_events();
+    let id1 = dispatcher.create_target(token, goal, deadline);
+    stop_cheat_caller_address(addr);
+
+    // Verify returned ID
+    assert(id1 == 1, 'first target ID should be 1');
+
+    // Verify event emitted
+    let expected1 = Event::TargetCreated(TargetCreated { caller: user, token, goal, deadline });
+    spy.assert_emitted(@array![(addr, expected1)]);
+
+    // Create second target
+    start_cheat_caller_address(addr, user);
+    let id2 = dispatcher.create_target(token, goal, deadline);
+    stop_cheat_caller_address(addr);
+
+    // Verify second ID
+    assert(id2 == 2, 'second target ID should be 2');
+}
+
+#[test]
+#[should_panic(expected: 'Token address cannot be zero')]
+fn test_create_target_reverts_on_zero_token() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+
+    let class = declare("PiggyStark").unwrap().contract_class();
+    let (addr, _) = class.deploy(@array![owner.into()]).unwrap();
+    let dispatcher = IPiggyStarkDispatcher { contract_address: addr };
+
+    let token = ZERO();
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 10;
+
+    // Attempt to create new target with zero token address
+    start_cheat_caller_address(addr, user);
+    dispatcher.create_target(token, goal, deadline);
+    stop_cheat_caller_address(addr);
+}
+
+#[test]
+#[should_panic(expected: 'Goal amount cannot be zero')]
+fn test_create_target_reverts_on_zero_goal() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+
+    let class = declare("PiggyStark").unwrap().contract_class();
+    let (addr, _) = class.deploy(@array![owner.into()]).unwrap();
+    let dispatcher = IPiggyStarkDispatcher { contract_address: addr };
+
+    let token = TOKEN_ADDRESS();
+    let goal = 0_u256;
+    let deadline = get_block_timestamp() + 10;
+
+    // Attempt to create new target with zero goal amount
+    start_cheat_caller_address(addr, user);
+    dispatcher.create_target(token, goal, deadline);
+    stop_cheat_caller_address(addr);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid deadline')]
+fn test_create_target_reverts_on_past_deadline() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+
+    let class = declare("PiggyStark").unwrap().contract_class();
+    let (addr, _) = class.deploy(@array![owner.into()]).unwrap();
+    let dispatcher = IPiggyStarkDispatcher { contract_address: addr };
+
+    let token = TOKEN_ADDRESS();
+    let goal = 100_u256;
+    let deadline = get_block_timestamp(); // not in the future
+
+    // Attempt to create new target with non-future deadline
+    start_cheat_caller_address(addr, user);
+    dispatcher.create_target(token, goal, deadline);
+    stop_cheat_caller_address(addr);
+}
