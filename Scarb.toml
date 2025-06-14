@@ -10,7 +10,7 @@ starknet = "2.9.4"
 openzeppelin = "1.0.0"
 
 [dev-dependencies]
-snforge_std = "0.37.0"
+snforge_std = "0.38.3"
 assert_macros = "2.9.4"
 
 [[target.starknet-contract]]

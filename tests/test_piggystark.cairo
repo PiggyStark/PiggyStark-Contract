@@ -88,7 +88,7 @@ fn test_zero_amount_create_asset() {
     let owner = OWNER();
     let amount: u256 = 200_000_000_000_000_000_000_000;
     let token_name: felt252 = 'STRK';
-
+<P></P>
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
