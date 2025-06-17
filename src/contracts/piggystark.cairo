@@ -8,7 +8,7 @@ pub mod PiggyStark {
     use starknet::event::EventEmitter;
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-        Vec, VecTrait,
+        Vec, VecTrait
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
 
@@ -19,7 +19,9 @@ pub mod PiggyStark {
         deposited_tokens: Vec<ContractAddress>,
         balance: Map<ContractAddress, u256>, // Track total balance per token
         targets_count: u64, // Total created targets, used to assign new IDs
-        targets: Map<u64, SavingsTarget> // Map SavingsTarget to its target ID
+        targets: Map<u64, SavingsTarget>, // Map SavingsTarget to its target ID
+        user_targets: Map<ContractAddress, Vec<u64>>, // Map user address to their target IDs
+        target_balances: Map<u64, u256>, // Track balance for each target
     }
 
     #[event]
@@ -29,6 +31,8 @@ pub mod PiggyStark {
         AssetCreated: AssetCreated,
         Withdrawal: Withdrawal,
         TargetCreated: TargetCreated,
+        TargetContributed: TargetContributed,
+        TargetCompleted: TargetCompleted,
     }
 
     #[derive(Drop, Serde, starknet::Event)]
@@ -59,6 +63,22 @@ pub mod PiggyStark {
         pub token: ContractAddress,
         pub goal: u256,
         pub deadline: u64,
+        pub target_id: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct TargetContributed {
+        pub caller: ContractAddress,
+        pub target_id: u64,
+        pub amount: u256,
+        pub remaining: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct TargetCompleted {
+        pub caller: ContractAddress,
+        pub target_id: u64,
+        pub total_saved: u256,
     }
 
     #[constructor]
@@ -74,13 +94,13 @@ pub mod PiggyStark {
             assert(amount > 0, errors.ZERO_TOKEN_AMOUNT);
 
             let caller: ContractAddress = get_caller_address();
-            let contract: ContractAddress = get_contract_address();
+            let _contract: ContractAddress = get_contract_address();
 
             let existing_asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
             assert(existing_asset_ref.is_none(), errors.ASSET_ALREADY_EXISTS);
 
             let erc20_dispatcher = IERC20Dispatcher { contract_address: token_address };
-            erc20_dispatcher.transfer_from(caller, contract, amount);
+            erc20_dispatcher.transfer_from(caller, _contract, amount);
 
             // Create new asset
             let new_asset = Asset { token_name, token_address, balance: amount };
@@ -100,15 +120,16 @@ pub mod PiggyStark {
             assert(amount > 0, errors.ZERO_TOKEN_AMOUNT);
 
             let caller = get_caller_address();
-            let contract = get_contract_address();
+            assert(caller.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+            let _contract = get_contract_address();
+
+            // Check if user has the asset
+            let prev_asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
+            assert(prev_asset_ref.is_some(), errors.USER_DOES_NOT_POSSESS_TOKEN);
 
             // Transfer tokens from user to contract
             let erc20_dispatcher = IERC20Dispatcher { contract_address: token_address };
-            erc20_dispatcher.transfer_from(caller, contract, amount);
-
-            // Update user deposit balance
-            let prev_asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
-            assert(prev_asset_ref.is_none(), errors.ASSET_DOES_NOT_EXIST);
+            erc20_dispatcher.transfer_from(caller, _contract, amount);
 
             let prev_asset = prev_asset_ref.unwrap();
             let new_balance = prev_asset.balance + amount;
@@ -130,11 +151,12 @@ pub mod PiggyStark {
             assert(amount > 0, errors.ZERO_TOKEN_AMOUNT);
 
             let caller = get_caller_address();
-            let contract = get_contract_address();
+            assert(caller.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+            let _contract = get_contract_address();
 
             // Check if user has the asset
             let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
-            assert(asset_ref.is_some(), errors.ASSET_DOES_NOT_EXIST);
+            assert(asset_ref.is_some(), errors.USER_DOES_NOT_POSSESS_TOKEN);
 
             let asset = asset_ref.unwrap();
             assert(asset.balance >= amount, errors.AMOUNT_OVERFLOWS_BALANCE);
@@ -165,30 +187,59 @@ pub mod PiggyStark {
             let current_time = get_block_timestamp();
             assert(deadline > current_time, errors.INVALID_DEADLINE);
 
+            let caller = get_caller_address();
             let target_id = self.targets_count.read() + 1;
             self.targets_count.write(target_id);
 
             let new_target = SavingsTarget { id: target_id, token_address, goal, deadline };
             self.targets.entry(target_id).write(new_target);
+            self.target_balances.entry(target_id).write(0);
 
-            self
-                .emit(
-                    TargetCreated {
-                        caller: get_caller_address(), token: token_address, goal, deadline,
-                    },
-                );
+            // Add target to user's list of targets
+            self.user_targets.entry(caller).push(target_id);
+
+            self.emit(
+                TargetCreated {
+                    caller,
+                    token: token_address,
+                    goal,
+                    deadline,
+                    target_id,
+                },
+            );
 
             target_id
         }
 
-        fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
-            let caller = get_caller_address();
-            let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
-
-            match asset_ref {
-                Option::Some(asset) => asset.balance,
-                Option::None => 0
+        fn get_user_targets(self: @ContractState, user: ContractAddress) -> Array<u64> {
+            let mut target_ids = array![];
+            let user_targets = self.user_targets.entry(user);
+            
+            let len = user_targets.len();
+            for i in 0..len {
+                target_ids.append(user_targets.at(i).read());
             }
+            target_ids
+        }
+
+        fn get_deposited_tokens(self: @ContractState) -> Array<ContractAddress> {
+            let mut tokens = array![];
+            let len = self.deposited_tokens.len();
+            for i in 0..len {
+                tokens.append(self.deposited_tokens.at(i).read());
+            }
+            tokens
+        }
+
+        fn get_token_balance(self: @ContractState, token_address: ContractAddress) -> u256 {
+            let errors = Errors::new();
+            let caller = get_caller_address();
+            assert(caller.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+            
+            let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
+            assert(asset_ref.is_some(), errors.USER_DOES_NOT_POSSESS_TOKEN);
+
+            asset_ref.unwrap().balance
         }
     }
 }
