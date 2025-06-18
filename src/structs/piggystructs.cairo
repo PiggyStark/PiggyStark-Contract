@@ -13,4 +13,7 @@ pub struct Target {
     pub goal: u256,
     pub deadline: u64,
     pub current_amount: u256,
+    pub created_at: u64,
+    pub last_updated: u64,
+    pub is_active: bool,
 }

@@ -10,7 +10,7 @@ pub mod PiggyStark {
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
         Vec, VecTrait,
     };
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
 
     #[storage]
     struct Storage {
@@ -23,6 +23,7 @@ pub mod PiggyStark {
         user_targets: Map<u64, Option<Target>>, // Track target
         targets_count: u64,
         contract_to_target_storage: Map<ContractAddress, bool>,
+        mock_token: ContractAddress,
     }
 
     #[event]
@@ -32,6 +33,7 @@ pub mod PiggyStark {
         AssetCreated: AssetCreated,
         Withdrawal: Withdrawal,
         TargetCreated: TargetCreated,
+        TargetContributed: TargetContributed,
     }
 
     #[derive(Drop, Serde, starknet::Event)]
@@ -65,9 +67,18 @@ pub mod PiggyStark {
         pub current_amount: u256,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct TargetContributed {
+        pub amount: u256,
+        pub target_id: u64,
+        pub last_updated: u64,
+        pub user: ContractAddress,
+    }
+
     #[constructor]
-    fn constructor(ref self: ContractState, owner: ContractAddress) {
+    fn constructor(ref self: ContractState, owner: ContractAddress, mock_token: ContractAddress) {
         self.owner.write(owner);
+        self.mock_token.write(mock_token);
     }
 
     #[abi(embed_v0)]
@@ -182,18 +193,23 @@ pub mod PiggyStark {
             }
         }
         fn create_target(ref self: ContractState, goal: u256, deadline: u64) -> u64 {
-            let errors = Errors::new();
             let caller = get_caller_address();
             // get a new target id
             let mut new_target_count: u64 = self.targets_count.read() + 1;
 
             // assert that user can only create on target
             assert(
-                self.contract_to_target_storage.entry(caller).read(), 'user already has a target',
+                self.contract_to_target_storage.entry(caller).read(), 'user already has a target'
             );
             // create a target for the user
             let new_target = Target {
-                user: caller, goal: goal, deadline: deadline, current_amount: 0,
+                user: caller,
+                goal: goal,
+                deadline: deadline,
+                current_amount: 0,
+                created_at: get_block_timestamp(),
+                last_updated: get_block_timestamp(),
+                is_active: true,
             };
 
             self.user_targets.entry(new_target_count).write(Option::Some(new_target));
@@ -217,42 +233,29 @@ pub mod PiggyStark {
 
         fn contribute_to_target(ref self: ContractState, target_id: u64, amount: u256) {
             let errors = Errors::new();
-            assert(amount > 0, errors.ZERO_AMOUNT);
+            self.contribute_to_target_checks(target_id, amount);
 
-            // Get caller and target
+            // get target and caller
+            let mut target: Target = self.user_targets.entry(target_id).read().unwrap();
             let caller = get_caller_address();
-            let target_ref = self.user_targets.entry(target_id).read();
-            assert(target_ref.is_some(), errors.TARGET_DOES_NOT_EXIST);
 
-            let mut target = target_ref.unwrap();
-
-            // Assert target not reached
-            assert(target.current_amount < target.goal, errors.TARGET_ALREADY_REACHED);
-
-            // Assert deadline not passed (assuming deadline is a timestamp, and you have a way to get block timestamp)
-            let block_timestamp = starknet::get_block_timestamp();
-            assert(block_timestamp <= target.deadline, errors.TARGET_DEADLINE_PASSED);
-
-            // Ensure contribution does not exceed the target goal
-            assert(target.current_amount + amount <= target.goal, errors.AMOUNT_OVERFLOWS_GOAL);
-
-            // Find user's asset for the target's token (assuming only one token per user/target)
-            let asset_ref = self.user_deposits.entry(caller).entry(target.user).read();
-            assert(asset_ref.is_some(), errors.ASSET_DOES_NOT_EXIST);
-            let mut asset = asset_ref.unwrap();
-            
-            assert(asset.balance >= amount, errors.AMOUNT_OVERFLOWS_BALANCE);
-            // Transfer tokens from user to contract (assuming a default token, or you may want to pass token_address)
-            let erc20_dispatcher = IERC20Dispatcher { contract_address: asset.token_address };
-            erc20_dispatcher.transfer_from(caller, get_contract_address(), amount);
-
-            // Update asset balance
-            asset.balance -= amount;
-            self.user_deposits.entry(caller).entry(asset.token_address).write(Option::Some(asset));
+            // transfer tokens from user to contract to update target
+            let dispatcher = IERC20Dispatcher { contract_address: self.mock_token.read() };
+            self.check_balance(dispatcher, caller, amount);
+            self.check_allowance(dispatcher, caller, amount);
+            dispatcher.transfer_from(caller, get_contract_address(), amount);
 
             // Update target's current_amount
             target.current_amount += amount;
+            target.last_updated = get_block_timestamp();
             self.user_targets.entry(target_id).write(Option::Some(target));
+
+            self
+                .emit(
+                    TargetContributed {
+                        amount, target_id, last_updated: target.last_updated, user: caller,
+                    },
+                );
         }
 
         fn get_target(self: @ContractState, target_id: u64) -> Option<Target> {
@@ -265,6 +268,58 @@ pub mod PiggyStark {
 
         fn get_target_count(self: @ContractState) -> u64 {
             self.targets_count.read()
+        }
+    }
+
+    #[generate_trait]
+    impl SecurityImpl of SecurityImplTrait {
+        fn contribute_to_target_checks(self: @ContractState, target_id: u64, amount: u256) {
+            let errors = Errors::new();
+            assert(amount > 0, errors.ZERO_AMOUNT);
+
+            // Get caller and target
+            let target_ref = self.user_targets.entry(target_id).read();
+            let target = target_ref.unwrap();
+            let caller = get_caller_address();
+
+            // assert target exists
+            assert(target_ref.is_some(), errors.TARGET_DOES_NOT_EXIST);
+
+            // Assert target not reached
+            assert(target.current_amount < target.goal, errors.TARGET_ALREADY_REACHED);
+
+            // assert target is active
+            assert(target.is_active == true, 'Target isnt active');
+            // Assert deadline not passed
+            let block_timestamp = starknet::get_block_timestamp();
+            assert(block_timestamp <= target.deadline, errors.TARGET_DEADLINE_PASSED);
+
+            // Ensure contribution does not exceed the target goal
+            assert(target.current_amount + amount <= target.goal, errors.AMOUNT_OVERFLOWS_GOAL);
+
+            let target_owner = target.user;
+            assert(caller == target_owner, 'Only owner contribute to target');
+        }
+
+        fn check_allowance(
+            self: @ContractState,
+            token_dispatcher: IERC20Dispatcher,
+            caller: ContractAddress,
+            amount: u256,
+        ) {
+            let contract_address = get_contract_address();
+            let allowed_amount = token_dispatcher.allowance(caller, contract_address);
+            assert(allowed_amount >= amount, 'Insufficient allowance');
+        }
+
+        fn check_balance(
+            self: @ContractState,
+            token_dispatcher: IERC20Dispatcher,
+            caller: ContractAddress,
+            amount: u256,
+        ) {
+            let user_balance = token_dispatcher.balance_of(caller);
+            assert(user_balance >= amount, 'Insufficient balance');
         }
     }
 }
