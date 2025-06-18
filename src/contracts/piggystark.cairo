@@ -192,6 +192,7 @@ pub mod PiggyStark {
                 Option::None => 0,
             }
         }
+
         fn create_target(ref self: ContractState, goal: u256, deadline: u64) -> u64 {
             let caller = get_caller_address();
             // get a new target id
@@ -199,7 +200,8 @@ pub mod PiggyStark {
 
             // assert that user can only create on target
             assert(
-                self.contract_to_target_storage.entry(caller).read(), 'user already has a target'
+                self.contract_to_target_storage.entry(caller).read() == false,
+                'user already has a target',
             );
             // create a target for the user
             let new_target = Target {
@@ -232,7 +234,6 @@ pub mod PiggyStark {
         }
 
         fn contribute_to_target(ref self: ContractState, target_id: u64, amount: u256) {
-            let errors = Errors::new();
             self.contribute_to_target_checks(target_id, amount);
 
             // get target and caller

@@ -15,7 +15,9 @@ fn setup(owner: ContractAddress) -> (IPiggyStarkDispatcher, ContractAddress) {
     let (erc20_address, _) = erc20_class.deploy(@calldata).unwrap();
 
     let contract_class = declare("PiggyStark").unwrap().contract_class();
-    let (contract_address, _) = contract_class.deploy(@array![owner.into()]).unwrap();
+    let (contract_address, _) = contract_class
+        .deploy(@array![owner.into(), erc20_address.into()])
+        .unwrap();
     let dispatcher = IPiggyStarkDispatcher { contract_address };
     (dispatcher, erc20_address)
 }
@@ -401,7 +403,7 @@ fn test_target_test_successful_create_target() {
     assert(target.is_some(), 'target not added');
 }
 #[test]
-#[should_panic(expected: 'User already has a target')]
+#[should_panic(expected: 'user already has a target')]
 fn test_target_test_user_already_has_target_create_target() {
     let owner = OWNER();
     let (contract, _) = setup(owner);
@@ -413,6 +415,39 @@ fn test_target_test_user_already_has_target_create_target() {
     let _ = contract.create_target(200, deadline);
     // Attempt to create a second target for the same user, should panic
     let _ = contract.create_target(300, deadline + 1000);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+fn test_target_contribute_to_target_function() {
+    let owner = OWNER();
+    let (contract, token_addr) = setup(owner);
+    let dispatcher = IERC20Dispatcher { contract_address: token_addr };
+
+    let deadline = 0x2137_u64;
+    let user1: ContractAddress = USER1().into();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
+
+    // Print balances before transfer
+    let owner_balance_before = dispatcher.balance_of(owner);
+    let user1_balance_before = dispatcher.balance_of(user1);
+    println!("Owner balance before: {}", owner_balance_before);
+    println!("User1 balance before: {}", user1_balance_before);
+
+    // cheat caller address and send tokens to user 1
+    start_cheat_caller_address(token_addr, owner);
+    dispatcher.transfer(user1, 200);
+    stop_cheat_caller_address(token_addr);
+
+    // Print balances after transfer
+    let owner_balance_after = dispatcher.balance_of(owner);
+    let user1_balance_after = dispatcher.balance_of(user1);
+    println!("Owner balance after: {}", owner_balance_after);
+    println!("User1 balance after: {}", user1_balance_after);
+
+    start_cheat_caller_address(contract.contract_address, USER1().into());
+    let new_target = contract.create_target(200, deadline);
+    contract.contribute_to_target(new_target, 20);
     stop_cheat_caller_address(contract.contract_address);
 }
 // #[test]
