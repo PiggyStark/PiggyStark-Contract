@@ -1,27 +1,29 @@
 #[starknet::contract]
 pub mod PiggyStark {
+    use core::num::traits::Zero;
+    use piggystark::errors::piggystark_errors::Errors;
     use piggystark::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use piggystark::interfaces::ipiggystark::IPiggyStark;
     use piggystark::structs::piggystructs::{Asset, SavingsTarget};
-    use piggystark::errors::piggystark_errors::Errors;
-    use core::num::traits::Zero;
     use starknet::event::EventEmitter;
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-        Vec, VecTrait
+        Vec, VecTrait,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
 
     #[storage]
     struct Storage {
         owner: ContractAddress,
-        user_deposits: Map<ContractAddress, Map<ContractAddress, Option<Asset>>>, // Map user address to a Map of token address, (option) token amount key-value
+        user_deposits: Map<
+            ContractAddress, Map<ContractAddress, Option<Asset>>,
+        >, // Map user address to a Map of token address, (option) token amount key-value
         deposited_tokens: Vec<ContractAddress>,
         balance: Map<ContractAddress, u256>, // Track total balance per token
         targets_count: u64, // Total created targets, used to assign new IDs
         targets: Map<u64, SavingsTarget>, // Map SavingsTarget to its target ID
         user_targets: Map<ContractAddress, Vec<u64>>, // Map user address to their target IDs
-        target_balances: Map<u64, u256>, // Track balance for each target
+        target_balances: Map<u64, u256> // Track balance for each target
     }
 
     #[event]
@@ -88,7 +90,12 @@ pub mod PiggyStark {
 
     #[abi(embed_v0)]
     impl PiggyStarkImpl of IPiggyStark<ContractState> {
-        fn create_asset(ref self: ContractState, token_address: ContractAddress, amount: u256, token_name: felt252) {
+        fn create_asset(
+            ref self: ContractState,
+            token_address: ContractAddress,
+            amount: u256,
+            token_name: felt252,
+        ) {
             let errors = Errors::new();
             assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
             assert(amount > 0, errors.ZERO_TOKEN_AMOUNT);
@@ -135,7 +142,9 @@ pub mod PiggyStark {
             let new_balance = prev_asset.balance + amount;
             assert(new_balance > prev_asset.balance, errors.AMOUNT_OVERFLOWS_BALANCE);
 
-            let new_asset = Asset { token_name: prev_asset.token_name, token_address, balance: new_balance };
+            let new_asset = Asset {
+                token_name: prev_asset.token_name, token_address, balance: new_balance,
+            };
             self.user_deposits.entry(caller).entry(token_address).write(Option::Some(new_asset));
 
             // Update total balance
@@ -163,8 +172,14 @@ pub mod PiggyStark {
 
             // Update user's asset balance
             let new_balance = asset.balance - amount;
-            let updated_asset = Asset { token_name: asset.token_name, token_address, balance: new_balance };
-            self.user_deposits.entry(caller).entry(token_address).write(Option::Some(updated_asset));
+            let updated_asset = Asset {
+                token_name: asset.token_name, token_address, balance: new_balance,
+            };
+            self
+                .user_deposits
+                .entry(caller)
+                .entry(token_address)
+                .write(Option::Some(updated_asset));
 
             // Update total balance
             let current_balance = self.balance.entry(token_address).read();
@@ -198,15 +213,7 @@ pub mod PiggyStark {
             // Add target to user's list of targets
             self.user_targets.entry(caller).push(target_id);
 
-            self.emit(
-                TargetCreated {
-                    caller,
-                    token: token_address,
-                    goal,
-                    deadline,
-                    target_id,
-                },
-            );
+            self.emit(TargetCreated { caller, token: token_address, goal, deadline, target_id });
 
             target_id
         }
@@ -214,7 +221,7 @@ pub mod PiggyStark {
         fn get_user_targets(self: @ContractState, user: ContractAddress) -> Array<u64> {
             let mut target_ids = array![];
             let user_targets = self.user_targets.entry(user);
-            
+
             let len = user_targets.len();
             for i in 0..len {
                 target_ids.append(user_targets.at(i).read());
@@ -235,11 +242,29 @@ pub mod PiggyStark {
             let errors = Errors::new();
             let caller = get_caller_address();
             assert(caller.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
-            
+
             let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
             assert(asset_ref.is_some(), errors.USER_DOES_NOT_POSSESS_TOKEN);
 
             asset_ref.unwrap().balance
+        }
+
+        fn get_user_assets(self: @ContractState) -> Array<Asset> {
+            let caller = get_caller_address();
+            let mut assets = ArrayTrait::new();
+            assert(self.deposited_tokens.len() > 0, 'no token availabe');
+            for i in 0..self.deposited_tokens.len() {
+                let token_address = self.deposited_tokens.at(i).read();
+                let current_user_possesses = self
+                    .user_deposits
+                    .entry(caller)
+                    .entry(token_address)
+                    .read();
+                assert(current_user_possesses.is_some(), 'Not owned by user');
+                let user_asset = current_user_possesses.unwrap();
+                assets.append(user_asset);
+            }
+            assets
         }
     }
 }
