@@ -252,7 +252,6 @@ pub mod PiggyStark {
         fn get_user_assets(self: @ContractState) -> Array<Asset> {
             let caller = get_caller_address();
             let mut assets = ArrayTrait::new();
-            assert(self.deposited_tokens.len() > 0, 'no token availabe');
             for i in 0..self.deposited_tokens.len() {
                 let token_address = self.deposited_tokens.at(i).read();
                 let current_user_possesses = self

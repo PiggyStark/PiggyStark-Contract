@@ -402,7 +402,6 @@ fn test_get_user_assets() {
 }
 
 #[test]
-#[should_panic(expected: 'no token availabe')]
 fn test_get_user_assets_no_token() {
     let owner = OWNER();
     let amount: u256 = 200_000_000_000_000_000_000_000;
