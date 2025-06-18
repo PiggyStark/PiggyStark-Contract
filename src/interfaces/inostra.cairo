@@ -23,5 +23,7 @@ pub trait INostra<TContractState> {
     /// @param account The address of the user.
     /// @param asset The address of the ERC20 token.
     /// @return The accrued yield amount.
-    fn get_user_yield(self: @TContractState, account: ContractAddress, asset: ContractAddress) -> u256;
+    fn get_user_yield(
+        self: @TContractState, account: ContractAddress, asset: ContractAddress,
+    ) -> u256;
 }

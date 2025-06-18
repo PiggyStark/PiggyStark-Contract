@@ -13,11 +13,7 @@ pub trait ITargetSavings<T> {
     ) -> u64;
 
     fn edit_goal(
-        ref self: T,
-        goal_id: u64,
-        new_target_amount: u256,
-        new_deadline: u64,
-        new_name: felt252,
+        ref self: T, goal_id: u64, new_target_amount: u256, new_deadline: u64, new_name: felt252,
     );
 
     fn delete_goal(ref self: T, goal_id: u64);

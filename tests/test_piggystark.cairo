@@ -6,11 +6,11 @@ use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
     stop_cheat_caller_address, test_address,
 };
-use starknet::{ContractAddress, contract_address_const};
+use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
 
 fn setup(owner: ContractAddress) -> (IPiggyStarkDispatcher, ContractAddress) {
     // Deploy mock ERC20
-    let erc20_class = declare("STRK").unwrap().contract_class();
+    let erc20_class = declare("STARKTOKEN").unwrap().contract_class();
     let mut calldata = array![owner.into(), owner.into(), 18];
     let (erc20_address, _) = erc20_class.deploy(@calldata).unwrap();
 
@@ -20,13 +20,17 @@ fn setup(owner: ContractAddress) -> (IPiggyStarkDispatcher, ContractAddress) {
     (dispatcher, erc20_address)
 }
 
-// Utility functions 
+// Utility functions
 fn OWNER() -> ContractAddress {
     contract_address_const::<'OWNER'>()
 }
 
 fn NON_OWNER() -> ContractAddress {
     contract_address_const::<'NON_OWNER'>()
+}
+
+fn USER1() -> ContractAddress {
+    contract_address_const::<'USER1'>()
 }
 
 fn TOKEN_ADDRESS() -> ContractAddress {
@@ -381,6 +385,36 @@ fn test_get_token_balance_from_Zero_caller_address() {
     stop_cheat_caller_address(contract.contract_address);
 }
 
+#[test]
+fn test_target_test_successful_create_target() {
+    let owner = OWNER();
+    let (contract, _) = setup(owner);
+
+    let deadline = 0x2137_u64;
+    start_cheat_caller_address(contract.contract_address, USER1().into());
+    let new_target = contract.create_target(200, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+    let target_count: u64 = contract.get_target_count();
+    let target = contract.get_target(new_target);
+    assert(new_target == 1, 'New target not created');
+    assert(target_count == 1, 'Incorrect target count');
+    assert(target.is_some(), 'target not added');
+}
+#[test]
+#[should_panic(expected: 'User already has a target')]
+fn test_target_test_user_already_has_target_create_target() {
+    let owner = OWNER();
+    let (contract, _) = setup(owner);
+
+    let deadline = 0x2137_u64;
+    let user1 = USER1().into();
+
+    start_cheat_caller_address(contract.contract_address, user1);
+    let _ = contract.create_target(200, deadline);
+    // Attempt to create a second target for the same user, should panic
+    let _ = contract.create_target(300, deadline + 1000);
+    stop_cheat_caller_address(contract.contract_address);
+}
 // #[test]
 // fn test_get_user_assets() {
 //     let owner = OWNER();
@@ -419,3 +453,4 @@ fn test_get_token_balance_from_Zero_caller_address() {
 //     stop_cheat_caller_address(contract.contract_address);
 //     assert(user_assets.len() == 0, ERRORS().SHOULD_HAVE_NO_TOKENS);
 // }
+

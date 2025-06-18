@@ -1,9 +1,11 @@
 use piggystark::contracts::target_savings::TargetSavings::{
-    Event, GoalCreated, GoalEdited,
-    GoalDeleted, FundsDeposited, FundsWithdrawn, FundsWithdrawnWithPenalty,
+    Event, GoalCreated, GoalEdited, GoalDeleted, FundsDeposited, FundsWithdrawn,
+    FundsWithdrawnWithPenalty,
 };
 use piggystark::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-use piggystark::interfaces::itargetsavings::{ITargetSavingsDispatcher, ITargetSavingsDispatcherTrait};
+use piggystark::interfaces::itargetsavings::{
+    ITargetSavingsDispatcher, ITargetSavingsDispatcherTrait,
+};
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait,
     cheat_block_timestamp, cheat_caller_address, declare, spy_events,
