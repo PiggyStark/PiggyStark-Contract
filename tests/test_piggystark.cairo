@@ -445,11 +445,36 @@ fn test_target_contribute_to_target_function() {
     println!("Owner balance after: {}", owner_balance_after);
     println!("User1 balance after: {}", user1_balance_after);
 
-    start_cheat_caller_address(contract.contract_address, USER1().into());
+    start_cheat_caller_address(contract.contract_address, user1);
     let new_target = contract.create_target(200, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    start_cheat_caller_address(token_addr, owner);
+    dispatcher.transfer(user1, 200);
+    stop_cheat_caller_address(token_addr);
+
+    start_cheat_caller_address(token_addr, user1);
+    dispatcher.approve(contract.contract_address, amount);
+    stop_cheat_caller_address(token_addr);
+
+    start_cheat_caller_address(contract.contract_address, user1);
     contract.contribute_to_target(new_target, 20);
     stop_cheat_caller_address(contract.contract_address);
+
+    let target_after = contract.get_target(new_target);
+    let user1_token_balance = dispatcher.balance_of(user1);
+    
+    // Check that the target exists and was updated
+    assert(target_after.is_some(), 'Target should exist');
+    let target_data = target_after.unwrap();
+    assert(target_data.current_amount == 20, 'Target contribution not updated');
+    assert(target_data.last_updated == deadline, 'last_updated not correct');
+
+    // Check that the user's ERC20 balance decreased by the contributed amount
+    let expected_balance = user1_balance_after - 20;
+    assert(user1_token_balance == expected_balance, 'User1 token balance not updated');
 }
+
 // #[test]
 // fn test_get_user_assets() {
 //     let owner = OWNER();
