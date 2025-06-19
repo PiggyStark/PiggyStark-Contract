@@ -1,10 +1,12 @@
 use core::traits::{Into, TryInto};
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-use piggystark::contracts::piggystark::PiggyStark::{Event, TargetCreated};
+use piggystark::contracts::piggystark::PiggyStark::{
+    Event, TargetCompleted, TargetContributed, TargetCreated,
+};
 use piggystark::interfaces::ipiggystark::{IPiggyStarkDispatcher, IPiggyStarkDispatcherTrait};
 use snforge_std::{
-    ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events,
-    start_cheat_caller_address, stop_cheat_caller_address, test_address,
+    ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, cheat_block_timestamp, declare,
+    spy_events, start_cheat_caller_address, stop_cheat_caller_address, test_address,
 };
 use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
 
@@ -521,4 +523,205 @@ fn test_create_target_reverts_on_past_deadline() {
     start_cheat_caller_address(addr, user);
     dispatcher.create_target(token, goal, deadline);
     stop_cheat_caller_address(addr);
+}
+
+#[test]
+fn test_contribute_to_target_success() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+
+    // Deploy contracts and setup
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, 40_000_u256);
+    stop_cheat_caller_address(erc20_address);
+
+    // User approves contract to spend tokens
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, 40_000_u256);
+    stop_cheat_caller_address(erc20_address);
+    // Approve tokens for user (NON_OWNER)
+    let amount: u256 = 500;
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, amount);
+    stop_cheat_caller_address(erc20_address);
+
+    // Create a target as user
+    let goal = 400_u256;
+    let deadline = get_block_timestamp() + 100;
+    start_cheat_caller_address(contract.contract_address, user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Contribute to the target
+    start_cheat_caller_address(contract.contract_address, user);
+    let mut spy = spy_events();
+    contract.contribute_to_target(erc20_address, target_id, 200_u256);
+    // Check TargetContributed event
+    let expected = Event::TargetContributed(
+        TargetContributed { caller: user, target_id, amount: 200_u256, remaining: 200_u256 },
+    );
+    spy.assert_emitted(@array![(contract.contract_address, expected)]);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Contribute again to complete the target
+    start_cheat_caller_address(contract.contract_address, user);
+    let mut spy2 = spy_events();
+    contract.contribute_to_target(erc20_address, target_id, 200_u256);
+    // Check TargetContributed and TargetCompleted events
+    let expected2 = Event::TargetContributed(
+        TargetContributed { caller: user, target_id, amount: 200_u256, remaining: 0_u256 },
+    );
+    let expected3 = Event::TargetCompleted(
+        TargetCompleted { caller: user, target_id, total_saved: 400_u256 },
+    );
+    spy2
+        .assert_emitted(
+            @array![(contract.contract_address, expected2), (contract.contract_address, expected3)],
+        );
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+
+#[test]
+#[should_panic(expected: 'Token address cannot be zero')]
+fn test_contribute_to_target_zero_token_address() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    start_cheat_caller_address(contract.contract_address, user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Try to contribute with zero token address
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(ZERO(), target_id, 10_u256);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Token amount cannot be zero')]
+fn test_contribute_to_target_zero_amount() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    start_cheat_caller_address(contract.contract_address, user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Try to contribute zero amount
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(erc20_address, target_id, 0_u256);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Called with the zero address')]
+fn test_contribute_to_target_zero_caller_address() {
+    let owner = OWNER();
+    let user = ZERO();
+    let (contract, erc20_address) = setup(owner);
+
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    let real_user = NON_OWNER();
+    start_cheat_caller_address(contract.contract_address, real_user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Try to contribute as zero address
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(erc20_address, target_id, 10_u256);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Token does not match target')]
+fn test_contribute_to_target_token_does_not_match() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+
+    // Deploy a second ERC20 token
+    let erc20_class = declare("STARKTOKEN").unwrap().contract_class();
+    let mut calldata = array![owner.into(), owner.into(), 18];
+    let (erc20_address2, _) = erc20_class.deploy(@calldata).unwrap();
+
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    start_cheat_caller_address(contract.contract_address, user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Try to contribute with a different token address
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(erc20_address2, target_id, 10_u256);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'ERC20: insufficient allowance')]
+fn test_contribute_to_target_insufficient_allowance() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+
+    // Give user tokens but do not approve contract
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, 100_u256);
+    stop_cheat_caller_address(erc20_address);
+
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    start_cheat_caller_address(contract.contract_address, user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Try to contribute without approval
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(erc20_address, target_id, 10_u256);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Amount overflows balance')]
+fn test_contribute_to_target_user_asset_balance_too_low() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+
+    // Give user tokens and approve
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, 100_u256);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, 100_u256);
+    stop_cheat_caller_address(erc20_address);
+
+    // User creates asset with small balance
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.create_asset(erc20_address, 10_u256, 'STK');
+    stop_cheat_caller_address(contract.contract_address);
+
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    start_cheat_caller_address(contract.contract_address, user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Try to contribute more than asset balance
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(erc20_address, target_id, 20_u256);
+    stop_cheat_caller_address(contract.contract_address);
 }

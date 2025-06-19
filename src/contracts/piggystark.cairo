@@ -218,6 +218,71 @@ pub mod PiggyStark {
             target_id
         }
 
+        fn contribute_to_target(
+            ref self: ContractState, token_address: ContractAddress, target_id: u64, amount: u256,
+        ) {
+            let errors = Errors::new();
+            assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
+            assert(amount > 0, errors.ZERO_TOKEN_AMOUNT);
+
+            let caller = get_caller_address();
+            assert(caller.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+
+            // Check target exists
+            let target = self.targets.entry(target_id).read();
+
+            // Check token matches target
+            assert(target.token_address == token_address, errors.TOKEN_DOES_NOT_MATCH_TARGET);
+
+            // Check deadline not passed
+            let current_time = get_block_timestamp();
+            assert(target.deadline > current_time, errors.TARGET_DEADLINE_PASSED);
+
+            // Transfer tokens from user to contract
+            let _contract = get_contract_address();
+            let erc20_dispatcher = IERC20Dispatcher { contract_address: token_address };
+            erc20_dispatcher.transfer_from(caller, _contract, amount);
+
+            // Update target balance
+            let prev_balance = self.target_balances.entry(target_id).read();
+            let new_balance = prev_balance + amount;
+            assert(new_balance > prev_balance, errors.AMOUNT_OVERFLOWS_BALANCE);
+            self.target_balances.entry(target_id).write(new_balance);
+
+            // Update user's asset balance if user has the asset
+            let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
+            if asset_ref.is_some() {
+                let asset = asset_ref.unwrap();
+                assert(asset.balance >= amount, errors.AMOUNT_OVERFLOWS_BALANCE);
+                let updated_asset = Asset {
+                    token_name: asset.token_name, token_address, balance: asset.balance - amount,
+                };
+                self
+                    .user_deposits
+                    .entry(caller)
+                    .entry(token_address)
+                    .write(Option::Some(updated_asset));
+            }
+
+            // Update total token balance
+            let current_token_balance = self.balance.entry(token_address).read();
+            self.balance.entry(token_address).write(current_token_balance + amount);
+
+            // Emit event
+            let remaining = if new_balance >= target.goal {
+                0
+            } else {
+                target.goal - new_balance
+            };
+            self.emit(TargetContributed { caller, target_id, amount, remaining });
+
+            // If target completed, emit event
+            if new_balance >= target.goal {
+                self.emit(TargetCompleted { caller, target_id, total_saved: new_balance });
+            }
+        }
+
+
         fn get_user_targets(self: @ContractState, user: ContractAddress) -> Array<u64> {
             let mut target_ids = array![];
             let user_targets = self.user_targets.entry(user);

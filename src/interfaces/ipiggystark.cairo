@@ -12,6 +12,9 @@ pub trait IPiggyStark<TContractState> {
     fn create_asset(
         ref self: TContractState, token_address: ContractAddress, amount: u256, token_name: felt252,
     );
+    fn create_asset(
+        ref self: TContractState, token_address: ContractAddress, amount: u256, token_name: felt252,
+    );
 
     /// Deposits tokens into the user's flexible savings wallet.
     /// Tokens are transferred from the user's wallet to the contract.
@@ -63,8 +66,9 @@ pub trait IPiggyStark<TContractState> {
     /// @param token_address The address of the ERC20 token to contribute.
     /// @param target_id The unique ID of the target to contribute to.
     /// @param amount The amount to contribute (must be <= remaining goal amount).
-    // fn contribute_to_target(ref self: TContractState, token_address: ContractAddress, target_id:
-    // u64, amount: u256);
+    fn contribute_to_target(
+        ref self: TContractState, token_address: ContractAddress, target_id: u64, amount: u256,
+    );
 
     /// Returns an array of target IDs associated with a user.
     /// @param user The address of the user to query.
