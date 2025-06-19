@@ -12,9 +12,6 @@ pub trait IPiggyStark<TContractState> {
     fn create_asset(
         ref self: TContractState, token_address: ContractAddress, amount: u256, token_name: felt252,
     );
-    fn create_asset(
-        ref self: TContractState, token_address: ContractAddress, amount: u256, token_name: felt252,
-    );
 
     /// Deposits tokens into the user's flexible savings wallet.
     /// Tokens are transferred from the user's wallet to the contract.
