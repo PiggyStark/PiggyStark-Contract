@@ -13,6 +13,8 @@ pub mod Errors {
         pub INCORRECT_BALANCE: felt252,
         pub ZERO_GOAL_AMOUNT: felt252,
         pub INVALID_DEADLINE: felt252,
+        pub TOKEN_DOES_NOT_MATCH_TARGET: felt252,
+        pub TARGET_DEADLINE_PASSED: felt252,
     }
 
     pub fn new() -> Errors {
@@ -29,6 +31,8 @@ pub mod Errors {
             INCORRECT_BALANCE: 'incorrect balance',
             ZERO_GOAL_AMOUNT: 'Goal amount cannot be zero',
             INVALID_DEADLINE: 'Invalid deadline',
+            TOKEN_DOES_NOT_MATCH_TARGET: 'Token does not match target',
+            TARGET_DEADLINE_PASSED: 'Target deadline passed',
         }
     }
 }
