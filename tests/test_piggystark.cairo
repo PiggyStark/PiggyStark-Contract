@@ -383,44 +383,44 @@ fn test_get_token_balance_from_Zero_caller_address() {
     stop_cheat_caller_address(contract.contract_address);
 }
 
-// #[test]
-// fn test_get_user_assets() {
-//     let owner = OWNER();
-//     let amount: u256 = 200_000_000_000_000_000_000_000;
+#[test]
+fn test_get_user_assets() {
+    let owner = OWNER();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
 
-//     let (contract, erc20_address) = setup(owner);
-//     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
-//     start_cheat_caller_address(erc20_address, owner);
-//     token_dispatcher.approve(contract.contract_address, amount);
-//     token_dispatcher.allowance(owner, contract.contract_address);
-//     stop_cheat_caller_address(erc20_address);
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.allowance(owner, contract.contract_address);
+    stop_cheat_caller_address(erc20_address);
 
-//     start_cheat_caller_address(contract.contract_address, owner);
-//     contract.create_asset(erc20_address, 300, 'STK');
-//     let user_assets = contract.get_user_assets();
-//     stop_cheat_caller_address(contract.contract_address);
-//     assert(user_assets.len() > 0, ERRORS().NO_TOKENS_AVAILABLE);
-// }
+    start_cheat_caller_address(contract.contract_address, owner);
+    contract.create_asset(erc20_address, 300, 'STK');
+    let user_assets = contract.get_user_assets();
+    stop_cheat_caller_address(contract.contract_address);
+    assert(user_assets.len() > 0, ERRORS().NO_TOKENS_AVAILABLE);
+}
 
-// #[test]
-// fn test_get_user_assets_no_token() {
-//     let owner = OWNER();
-//     let amount: u256 = 200_000_000_000_000_000_000_000;
+#[test]
+fn test_get_user_assets_no_token() {
+    let owner = OWNER();
+    let amount: u256 = 200_000_000_000_000_000_000_000;
 
-//     let (contract, erc20_address) = setup(owner);
-//     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
-//     start_cheat_caller_address(erc20_address, owner);
-//     token_dispatcher.approve(contract.contract_address, amount);
-//     token_dispatcher.allowance(owner, contract.contract_address);
-//     stop_cheat_caller_address(erc20_address);
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.allowance(owner, contract.contract_address);
+    stop_cheat_caller_address(erc20_address);
 
-//     start_cheat_caller_address(contract.contract_address, owner);
-//     let user_assets = contract.get_user_assets();
-//     stop_cheat_caller_address(contract.contract_address);
-//     assert(user_assets.len() == 0, ERRORS().SHOULD_HAVE_NO_TOKENS);
-// }
+    start_cheat_caller_address(contract.contract_address, owner);
+    let user_assets = contract.get_user_assets();
+    stop_cheat_caller_address(contract.contract_address);
+    assert(user_assets.len() == 0, ERRORS().SHOULD_HAVE_NO_TOKENS);
+}
 
 #[test]
 fn test_create_target_success() {

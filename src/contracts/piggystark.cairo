@@ -313,5 +313,22 @@ pub mod PiggyStark {
 
             asset_ref.unwrap().balance
         }
+
+        fn get_user_assets(self: @ContractState) -> Array<Asset> {
+            let caller = get_caller_address();
+            let mut assets = ArrayTrait::new();
+            for i in 0..self.deposited_tokens.len() {
+                let token_address = self.deposited_tokens.at(i).read();
+                let current_user_possesses = self
+                    .user_deposits
+                    .entry(caller)
+                    .entry(token_address)
+                    .read();
+                assert(current_user_possesses.is_some(), 'Not owned by user');
+                let user_asset = current_user_possesses.unwrap();
+                assets.append(user_asset);
+            }
+            assets
+        }
     }
 }

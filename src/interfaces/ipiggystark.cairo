@@ -1,4 +1,4 @@
-// use piggystark::structs::piggystructs::Asset;
+use piggystark::structs::piggystructs::Asset;
 use starknet::ContractAddress;
 
 #[starknet::interface]
@@ -130,7 +130,7 @@ pub trait IPiggyStark<TContractState> {
     /// Aggregates flexible, locked, and target savings balances for a comprehensive view.
     /// Useful for displaying a user's portfolio in the frontend.
     /// @return An array of Asset structs containing token addresses and balances.
-    // fn get_user_assets(self: @TContractState) -> Array<Asset>;
+    fn get_user_assets(self: @TContractState) -> Array<Asset>;
 
     /// Returns the balance of a specific token for the caller.
     /// @param token_address The address of the ERC20 token to query.
