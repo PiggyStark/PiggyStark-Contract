@@ -330,5 +330,19 @@ pub mod PiggyStark {
             }
             assets
         }
+
+
+        fn get_balance(
+            self: @ContractState, user: ContractAddress, token_address: ContractAddress,
+        ) -> u256 {
+            let errors = Errors::new();
+            assert(user.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+            assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
+
+            let asset_ref = self.user_deposits.entry(user).entry(token_address).read();
+            assert(asset_ref.is_some(), errors.USER_DOES_NOT_POSSESS_TOKEN);
+
+            asset_ref.unwrap().balance
+        }
     }
 }
