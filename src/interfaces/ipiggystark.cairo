@@ -137,19 +137,23 @@ pub trait IPiggyStark<TContractState> {
     /// @return The balance of the token for the caller.
     fn get_token_balance(self: @TContractState, token_address: ContractAddress) -> u256;
     // fn edit_target(
-//     ref self: TContractState,
-//     target_id: u64,
-//     new_goal: u256,
-//     new_deadline: u64,
-//     new_name: felt252,
-// );
-// fn delete_target(ref self: TContractState, target_id: u64);
-// fn contribute_to_target(ref self: TContractState, target_id: u4, amount: u256);
-// fn withdraw_from_target(ref self: TContractState, target_id: u4, amount: u256);
-// fn withdraw_from_target_with_penalty(ref self: TContractState, target_id: u4, amount: u256);
-// fn get_target(self: @TContractState, target_id: u4) -> SavingsGoal;
-// fn get_user_targets_details(self: @TContractState) -> Array<SavingsGoal>;
-// fn get_target_progress(self: @TContractState, target_id: u4) -> (u256, u256);
-// fn is_target_reached(self: @TContractState, target_id: u4) -> bool;
-// fn is_target_deadline_passed(self: @TContractState, target_id: u4) -> bool;
+    //     ref self: TContractState,
+    //     target_id: u64,
+    //     new_goal: u256,
+    //     new_deadline: u64,
+    //     new_name: felt252,
+    // );
+    // fn delete_target(ref self: TContractState, target_id: u64);
+    // fn contribute_to_target(ref self: TContractState, target_id: u4, amount: u256);
+    // fn withdraw_from_target(ref self: TContractState, target_id: u4, amount: u256);
+    // fn withdraw_from_target_with_penalty(ref self: TContractState, target_id: u4, amount: u256);
+    // fn get_target(self: @TContractState, target_id: u4) -> SavingsGoal;
+    // fn get_user_targets_details(self: @TContractState) -> Array<SavingsGoal>;
+    // fn get_target_progress(self: @TContractState, target_id: u4) -> (u256, u256);
+    // fn is_target_reached(self: @TContractState, target_id: u4) -> bool;
+    // fn is_target_deadline_passed(self: @TContractState, target_id: u4) -> bool;
+
+    fn get_balance(
+        self: @TContractState, user: ContractAddress, token_address: ContractAddress,
+    ) -> u256;
 }

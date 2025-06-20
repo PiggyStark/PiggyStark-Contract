@@ -725,3 +725,83 @@ fn test_contribute_to_target_user_asset_balance_too_low() {
     contract.contribute_to_target(erc20_address, target_id, 20_u256);
     stop_cheat_caller_address(contract.contract_address);
 }
+
+
+#[test]
+fn test_get_balance_success() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let amount: u256 = 1000;
+
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    // Give user tokens and approve
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, amount);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, amount);
+    stop_cheat_caller_address(erc20_address);
+
+    // User creates asset
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.create_asset(erc20_address, 300, 'STK');
+    contract.deposit(erc20_address, 500);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Test get_balance from any caller (owner in this case)
+    start_cheat_caller_address(contract.contract_address, owner);
+    let balance = contract.get_balance(user, erc20_address);
+    stop_cheat_caller_address(contract.contract_address);
+
+    assert(balance == 800, 'Balance should be 800'); // 300 + 500
+}
+
+
+#[test]
+fn test_get_balance_multiple_users() {
+    let owner = OWNER();
+    let user1 = NON_OWNER();
+    let user2 = contract_address_const::<'USER2'>();
+    let amount: u256 = 1000;
+
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    // Setup user1
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user1, amount);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(erc20_address, user1);
+    token_dispatcher.approve(contract.contract_address, amount);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(contract.contract_address, user1);
+    contract.create_asset(erc20_address, 300, 'STK');
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Setup user2
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user2, amount);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(erc20_address, user2);
+    token_dispatcher.approve(contract.contract_address, amount);
+    stop_cheat_caller_address(erc20_address);
+
+    start_cheat_caller_address(contract.contract_address, user2);
+    contract.create_asset(erc20_address, 500, 'STK');
+    stop_cheat_caller_address(contract.contract_address);
+
+    start_cheat_caller_address(contract.contract_address, owner);
+    let balance1 = contract.get_balance(user1, erc20_address);
+    let balance2 = contract.get_balance(user2, erc20_address);
+    stop_cheat_caller_address(contract.contract_address);
+
+    assert(balance1 == 300, 'User1 balance should be 300');
+    assert(balance2 == 500, 'User2 balance should be 500');
+}
+
