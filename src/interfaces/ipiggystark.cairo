@@ -117,8 +117,7 @@ pub trait IPiggyStark<TContractState> {
     /// @param user The address of the user to query.
     /// @param target_id The unique ID of the target.
     /// @return A tuple containing the goal amount, current saved amount, and deadline.
-    // fn get_target_savings(self: @TContractState, user: ContractAddress, target_id: u64) -> (u256,
-    // u256, u64);
+    fn get_target_savings(self: @TContractState, user: ContractAddress, target_id: u64) -> (u256, u256, u64);
 
     /// Returns the current yield rate for a specific token from Nostra.
     /// Useful for displaying expected returns in the frontend.

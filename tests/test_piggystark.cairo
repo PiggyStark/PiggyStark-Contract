@@ -822,3 +822,94 @@ fn test_get_balance_multiple_users() {
     assert(balance2 == 500, 'User2 balance should be 500');
 }
 
+#[test]
+fn test_get_target_savings_success() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+    let goal = 500_u256;
+    let deadline = get_block_timestamp() + 1000;
+
+    // Give user tokens and approve
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, 1000_u256);
+    stop_cheat_caller_address(erc20_address);
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, 1000_u256);
+    stop_cheat_caller_address(erc20_address);
+
+    // User creates asset and target
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.create_asset(erc20_address, 500_u256, 'STK');
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // No contributions yet
+    let (ret_goal, ret_saved, ret_deadline) = contract.get_target_savings(user, target_id);
+    assert(ret_goal == goal, 'Goal mismatch');
+    assert(ret_saved == 0_u256, 'Saved should be zero');
+    assert(ret_deadline == deadline, 'Deadline mismatch');
+
+    // Contribute to target
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(erc20_address, target_id, 200_u256);
+    stop_cheat_caller_address(contract.contract_address);
+    let (_, ret_saved2, _) = contract.get_target_savings(user, target_id);
+    assert(ret_saved2 == 200_u256, 'Saved target should be 200');
+
+    // Contribute again
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.contribute_to_target(erc20_address, target_id, 300_u256);
+    stop_cheat_caller_address(contract.contract_address);
+    let (_, ret_saved3, _) = contract.get_target_savings(user, target_id);
+    assert(ret_saved3 == 500_u256, 'Saved target should be 500');
+}
+
+#[test]
+#[should_panic(expected: 'User does not own this target')]
+fn test_get_target_savings_unauthorized() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    // User creates target
+    start_cheat_caller_address(contract.contract_address, user);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+    // Owner tries to access user's target
+    contract.get_target_savings(owner, target_id);
+}
+
+#[test]
+#[should_panic(expected: 'User does not own this target')]
+fn test_get_target_savings_nonexistent_target_for_user() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let (contract, erc20_address) = setup(owner);
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    // User creates target
+    start_cheat_caller_address(contract.contract_address, user);
+    let _target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+    // User tries to access a target they don't own (id 999)
+    contract.get_target_savings(user, 999_u64);
+}
+
+#[test]
+#[should_panic(expected: 'Called with the zero address')]
+fn test_get_target_savings_zero_user_address() {
+    let owner = OWNER();
+    let (contract, erc20_address) = setup(owner);
+    let goal = 100_u256;
+    let deadline = get_block_timestamp() + 100;
+    // Owner creates target
+    start_cheat_caller_address(contract.contract_address, owner);
+    let target_id = contract.create_target(erc20_address, goal, deadline);
+    stop_cheat_caller_address(contract.contract_address);
+    // Call with zero address
+    contract.get_target_savings(ZERO(), target_id);
+}
+

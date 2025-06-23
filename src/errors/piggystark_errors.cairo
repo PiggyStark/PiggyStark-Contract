@@ -15,6 +15,7 @@ pub mod Errors {
         pub INVALID_DEADLINE: felt252,
         pub TOKEN_DOES_NOT_MATCH_TARGET: felt252,
         pub TARGET_DEADLINE_PASSED: felt252,
+        pub USER_DOES_NOT_OWN_TARGET: felt252,
     }
 
     pub fn new() -> Errors {
@@ -33,6 +34,7 @@ pub mod Errors {
             INVALID_DEADLINE: 'Invalid deadline',
             TOKEN_DOES_NOT_MATCH_TARGET: 'Token does not match target',
             TARGET_DEADLINE_PASSED: 'Target deadline passed',
+            USER_DOES_NOT_OWN_TARGET: 'User does not own this target',
         }
     }
 }
