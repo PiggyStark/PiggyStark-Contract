@@ -344,5 +344,27 @@ pub mod PiggyStark {
 
             asset_ref.unwrap().balance
         }
+
+        fn get_target_savings(self: @ContractState, user: ContractAddress, target_id: u64) -> (u256, u256, u64) {
+            let errors = Errors::new();
+            // Validate user address
+            assert(user.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+            // Check that the target exists
+            let target_ref = self.targets.entry(target_id).read();
+            // Check that the user owns this target
+            let user_targets_vec = self.user_targets.entry(user);
+            let mut found = false;
+            let len = user_targets_vec.len();
+            for i in 0..len {
+                if user_targets_vec.at(i).read() == target_id {
+                    found = true;
+                    break;
+                }
+            }
+            assert(found, errors.USER_DOES_NOT_OWN_TARGET);
+            // Get the saved amount for this target
+            let saved = self.target_balances.entry(target_id).read();
+            (target_ref.goal, saved, target_ref.deadline)
+        }
     }
 }
