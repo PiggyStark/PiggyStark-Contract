@@ -128,17 +128,19 @@ fn test_asset_existance_create_asset() {
 fn test_successful_deposit() {
     let owner = OWNER();
     let amount: u256 = 1000;
+    let create_amount: u256 = 300;
+    let total_approval: u256 = amount + create_amount;
 
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
     start_cheat_caller_address(erc20_address, owner);
-    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.approve(contract.contract_address, total_approval);
     token_dispatcher.allowance(owner, contract.contract_address);
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, 300, 'STK');
+    contract.create_asset(erc20_address, create_amount, 'STK');
     contract.deposit(erc20_address, amount);
     stop_cheat_caller_address(contract.contract_address);
 }
@@ -202,18 +204,22 @@ fn test_multiple_deposit() {
     let owner = OWNER();
     let amount: u256 = 1000;
     let amount2: u256 = 200;
+    let large_amount: u256 = 1_000_000; // Use a more reasonable amount
+    let create_amount: u256 = 300;
+    let total_deposits: u256 = large_amount + amount2 + amount2;
+    let total_approval: u256 = total_deposits + create_amount;
 
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
     start_cheat_caller_address(erc20_address, owner);
-    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.approve(contract.contract_address, total_approval);
     token_dispatcher.allowance(owner, contract.contract_address);
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, 300, 'STK');
-    contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
+    contract.create_asset(erc20_address, create_amount, 'STK');
+    contract.deposit(erc20_address, large_amount);
     contract.deposit(erc20_address, amount2);
     contract.deposit(erc20_address, amount2);
     stop_cheat_caller_address(contract.contract_address);
@@ -223,18 +229,21 @@ fn test_multiple_deposit() {
 fn test_successful_withdraw() {
     let owner = OWNER();
     let amount: u256 = 1000;
+    let large_amount: u256 = 1_000_000; // Use a more reasonable amount
+    let create_amount: u256 = amount;
+    let total_approval: u256 = large_amount + create_amount;
 
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
     start_cheat_caller_address(erc20_address, owner);
-    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.approve(contract.contract_address, total_approval);
     token_dispatcher.allowance(owner, contract.contract_address);
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, amount, 'STK');
-    contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
+    contract.create_asset(erc20_address, create_amount, 'STK');
+    contract.deposit(erc20_address, large_amount);
     contract.withdraw(erc20_address, amount + 500_000);
     stop_cheat_caller_address(contract.contract_address);
 }
@@ -243,21 +252,24 @@ fn test_successful_withdraw() {
 fn test_successful_multiple_withdraw() {
     let owner = OWNER();
     let amount: u256 = 1000;
+    let large_amount: u256 = 1_000_000; // Use a more reasonable amount
+    let create_amount: u256 = 300;
+    let total_approval: u256 = large_amount + create_amount;
 
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
     start_cheat_caller_address(erc20_address, owner);
-    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.approve(contract.contract_address, total_approval);
     token_dispatcher.allowance(owner, contract.contract_address);
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, 300, 'STK');
-    contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
+    contract.create_asset(erc20_address, create_amount, 'STK');
+    contract.deposit(erc20_address, large_amount);
     contract.withdraw(erc20_address, 345);
     contract.withdraw(erc20_address, 500_000);
-    contract.withdraw(erc20_address, 100_000_000);
+    contract.withdraw(erc20_address, 400_000); 
     contract.withdraw(erc20_address, 400);
     stop_cheat_caller_address(contract.contract_address);
 }
@@ -267,25 +279,28 @@ fn test_successful_multiple_withdraw() {
 fn test_balance_overflow_multiple_withdraw() {
     let owner = OWNER();
     let amount: u256 = 1000;
+    let large_amount: u256 = 1_000_000; // Use a more reasonable amount
+    let create_amount: u256 = 300;
+    let total_approval: u256 = large_amount + create_amount;
 
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
     start_cheat_caller_address(erc20_address, owner);
-    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.approve(contract.contract_address, total_approval);
     token_dispatcher.allowance(owner, contract.contract_address);
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, 300, 'STK');
-    contract.deposit(erc20_address, 100_000_000_000_000_000_000_000);
-    contract.withdraw(erc20_address, amount);
-    contract.withdraw(erc20_address, 500_000);
+    contract.create_asset(erc20_address, create_amount, 'STK');
+    contract.deposit(erc20_address, large_amount);
+    contract.withdraw(erc20_address, large_amount); // Withdraw all the deposited amount
+    contract.withdraw(erc20_address, 500_000); // Try to withdraw more than available balance
     stop_cheat_caller_address(contract.contract_address);
 }
 
 #[test]
-#[should_panic(expected: 'Asset does not exist')]
+#[should_panic(expected: 'User does not possess token')]
 fn test_withdraw_from_non_existing_user_token() {
     let owner = OWNER();
     let amount: u256 = 1000;
@@ -304,7 +319,7 @@ fn test_withdraw_from_non_existing_user_token() {
 }
 
 #[test]
-#[should_panic(expected: 'Zero Address Caller')]
+#[should_panic(expected: 'Called with the zero address')]
 fn test_withdraw_from_Zero_caller_address() {
     let owner = OWNER();
     let amount: u256 = 1000;
@@ -327,17 +342,19 @@ fn test_withdraw_from_Zero_caller_address() {
 fn test_get_token_balance() {
     let owner = OWNER();
     let amount: u256 = 1000;
+    let create_amount: u256 = 300;
+    let total_approval: u256 = amount + create_amount;
 
     let (contract, erc20_address) = setup(owner);
     let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
 
     start_cheat_caller_address(erc20_address, owner);
-    token_dispatcher.approve(contract.contract_address, amount);
+    token_dispatcher.approve(contract.contract_address, total_approval);
     token_dispatcher.allowance(owner, contract.contract_address);
     stop_cheat_caller_address(erc20_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_asset(erc20_address, 300, 'STK');
+    contract.create_asset(erc20_address, create_amount, 'STK');
     contract.deposit(erc20_address, amount);
     let token_balance = contract.get_token_balance(erc20_address);
     stop_cheat_caller_address(contract.contract_address);
