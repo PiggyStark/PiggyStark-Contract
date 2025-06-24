@@ -34,13 +34,16 @@ pub trait IPiggyStark<TContractState> {
     /// @param amount The amount of tokens to lock (must be <= user's flexible balance).
     /// @param lock_duration The duration (in seconds) for which funds are locked.
     /// @return The unique ID of the created lock.
-    fn lock_savings(ref self: TContractState, token_address: ContractAddress, amount: u256, lock_duration: u64) -> u64;
+    fn lock_savings(
+        ref self: TContractState, token_address: ContractAddress, amount: u256, lock_duration: u64,
+    ) -> u64;
 
     /// Unlocks and releases funds from a specific lock once the lock duration has expired.
     /// Funds are moved back to the user's flexible balance and withdrawn from Nostra if applicable.
     /// Emits an Unlocked event.
     /// @param token_address The address of the ERC20 token to unlock.
-    /// @param lock_id The unique ID of the lock to release. This ID is returned when calling lock_savings().
+    /// @param lock_id The unique ID of the lock to release. This ID is returned when calling
+    /// lock_savings().
     fn unlock_savings(ref self: TContractState, token_address: ContractAddress, lock_id: u64);
 
     // === Target Savings Functions ===
@@ -107,14 +110,18 @@ pub trait IPiggyStark<TContractState> {
     /// @param token_address The address of the ERC20 token.
     /// @param lock_id The unique ID of the lock.
     /// @return A tuple containing the locked amount and the unlock timestamp.
-    fn get_locked_balance(self: @TContractState, user: ContractAddress, token_address: ContractAddress, lock_id: u64) -> (u256, u64);
+    fn get_locked_balance(
+        self: @TContractState, user: ContractAddress, token_address: ContractAddress, lock_id: u64,
+    ) -> (u256, u64);
 
     /// Returns details of a specific savings target.
     /// Useful for displaying target progress in the frontend.
     /// @param user The address of the user to query.
     /// @param target_id The unique ID of the target.
     /// @return A tuple containing the goal amount, current saved amount, and deadline.
-    fn get_target_savings(self: @TContractState, user: ContractAddress, target_id: u64) -> (u256, u256, u64);
+    fn get_target_savings(
+        self: @TContractState, user: ContractAddress, target_id: u64,
+    ) -> (u256, u256, u64);
 
     /// Returns the current yield rate for a specific token from Nostra.
     /// Useful for displaying expected returns in the frontend.

@@ -1,28 +1,22 @@
 use core::traits::{Into, TryInto};
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use piggystark::contracts::piggystark::PiggyStark::{
-    Event, TargetCompleted, TargetContributed, TargetCreated,
+    AssetCreated, Event, Locked, NostraDeposit, NostraWithdrawal, SuccessfulDeposit,
+    TargetCompleted, TargetContributed, TargetCreated, Unlocked, Withdrawal,
 };
+use piggystark::interfaces::inostra::{INostraDispatcher, INostraDispatcherTrait};
 use piggystark::interfaces::ipiggystark::{IPiggyStarkDispatcher, IPiggyStarkDispatcherTrait};
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, cheat_block_timestamp, declare,
-    spy_events, start_cheat_caller_address, stop_cheat_caller_address, test_address,  start_cheat_block_timestamp,  stop_cheat_block_timestamp,
+    spy_events, start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_block_timestamp,
+    stop_cheat_caller_address, test_address,
 };
 use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
-use piggystark::contracts::piggystark::PiggyStark::{
-    SuccessfulDeposit, AssetCreated, Withdrawal, Locked, Unlocked, NostraDeposit, NostraWithdrawal,
-};
-use piggystark::interfaces::inostra::{INostraDispatcher, INostraDispatcherTrait};
-// use snforge_std::{
-//     CheatSpan, EventSpyAssertionsTrait, cheat_block_timestamp, cheat_caller_address, spy_events,
-// };
 
-fn NOSTRA() -> ContractAddress {
-    contract_address_const::<'NOSTRA'>()
-}
 
 fn setup(owner: ContractAddress) -> (IPiggyStarkDispatcher, ContractAddress) {
     // Deploy mock ERC20
+    let initial_supply: u256 = 100_000_000_000_000_000_000; // 100 tokens with 18 decimals
     let erc20_class = declare("STARKTOKEN").unwrap().contract_class();
     let mut calldata = array![owner.into(), owner.into(), 18];
     let (erc20_address, _) = erc20_class.deploy(@calldata).unwrap();
@@ -280,7 +274,7 @@ fn test_successful_multiple_withdraw() {
     contract.deposit(erc20_address, large_amount);
     contract.withdraw(erc20_address, 345);
     contract.withdraw(erc20_address, 500_000);
-    contract.withdraw(erc20_address, 400_000); 
+    contract.withdraw(erc20_address, 400_000);
     contract.withdraw(erc20_address, 400);
     stop_cheat_caller_address(contract.contract_address);
 }
@@ -925,4 +919,50 @@ fn test_get_target_savings_zero_user_address() {
     // Call with zero address
     contract.get_target_savings(ZERO(), target_id);
 }
+
+#[test]
+fn test_lock_savings_success() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let amount: u256 = 1000;
+    let large_amount: u256 = 1_000_000; // Use a more reasonable amount
+    let create_amount: u256 = amount;
+    let total_approval: u256 = large_amount + create_amount;
+    let lock_duration = 459;
+
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let mut spy = spy_events();
+
+    // Give user tokens and they should approve piggy contract
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, total_approval);
+    stop_cheat_caller_address(erc20_address);
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, total_approval);
+    stop_cheat_caller_address(erc20_address);
+
+    // User actions: Create asset -> deposit (optional) -> lock
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.create_asset(erc20_address, create_amount, 'STK');
+    contract.deposit(erc20_address, large_amount);
+    let balance = contract.get_balance(user, erc20_address); // lock all user balance
+    let lock_id = contract.lock_savings(erc20_address, balance, lock_duration);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Verify savings was locked
+    let expected_unlock_time = get_block_timestamp() + lock_duration;
+    let (locked_amount, unlock_time) = contract.get_locked_balance(user, erc20_address, lock_id);
+    assert(locked_amount == balance, 'Locked amount mismatch');
+    assert(unlock_time > 0, 'Invalid unlock time');
+    assert(unlock_time == expected_unlock_time, 'Unlock time mismatch');
+
+    // Verify events were emitted
+    let expected_lock_event = Event::Locked(
+        Locked { caller: user, token: erc20_address, amount: balance, lock_id, lock_duration },
+    );
+    spy.assert_emitted(@array![(contract.contract_address, expected_lock_event)]);
+}
+
 

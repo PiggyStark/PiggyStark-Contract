@@ -44,8 +44,6 @@ pub mod Errors {
             TOKEN_ADDRESS_MISMATCH: 'Token address mismatch',
             INACTIVE_LOCK: 'Inactive lock',
             NOT_LOCK_OWNER: 'Not lock owner',
-
-
             ZERO_GOAL_AMOUNT: 'Goal amount cannot be zero',
             INVALID_DEADLINE: 'Invalid deadline',
             TOKEN_DOES_NOT_MATCH_TARGET: 'Token does not match target',
