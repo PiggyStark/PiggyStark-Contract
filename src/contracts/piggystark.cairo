@@ -2,6 +2,7 @@
 pub mod PiggyStark {
     use piggystark::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
     use piggystark::interfaces::ipiggystark::IPiggyStark;
+    use piggystark::interfaces::inostra::{INostraDispatcher, INostraDispatcherTrait};
     use piggystark::structs::piggystructs::{Asset, LockedSavings};
     use piggystark::errors::piggystark_errors::Errors;
     use core::num::traits::Zero;
@@ -19,8 +20,9 @@ pub mod PiggyStark {
         deposited_tokens: Vec<ContractAddress>,
         balance: Map<ContractAddress, u256>, // Track total balance per token
         locks_count: u64,
-        user_locks: Map::<(ContractAddress, u64), bool>, // Maps user addresses to locks by ID
-        locks: Map::<u64, LockedSavings>, // Maps lock IDs to LockedSavings
+        user_locks: Map<(ContractAddress, u64), bool>, // Maps user addresses to locks by ID
+        locks: Map<u64, LockedSavings>, // Maps lock IDs to LockedSavings
+        nostra_contract: ContractAddress, // Address of the Nostra contract
     }
 
     #[event]
@@ -31,6 +33,8 @@ pub mod PiggyStark {
         Withdrawal: Withdrawal,
         Locked: Locked,
         Unlocked: Unlocked,
+        NostraDeposit: NostraDeposit,
+        NostraWithdrawal: NostraWithdrawal,
     }
 
     #[derive(Drop, Serde, starknet::Event)]
@@ -72,10 +76,27 @@ pub mod PiggyStark {
         pub lock_id: u64,
     }
 
+    #[derive(Drop, Serde, starknet::Event)]
+    pub struct NostraDeposit {
+        pub caller: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
+        pub lock_id: u64,
+    }
+
+    #[derive(Drop, Serde, starknet::Event)]
+    pub struct NostraWithdrawal {
+        pub caller: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
+        pub lock_id: u64,
+    }
+
     #[constructor]
-    fn constructor(ref self: ContractState, owner: ContractAddress) {
+    fn constructor(ref self: ContractState, owner: ContractAddress, nostra_contract: ContractAddress) {
         self.owner.write(owner);
         self.locks_count.write(0);
+        self.nostra_contract.write(nostra_contract);
     }
 
     #[abi(embed_v0)]
@@ -188,7 +209,7 @@ pub mod PiggyStark {
             let errors = Errors::new();
             assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
             assert(amount > 0, errors.ZERO_TOKEN_AMOUNT);
-            assert(lock_duration > 0, 'Lock duration must be positive');
+            assert(lock_duration > 0, errors.ZERO_LOCK_DURATION);
 
             let caller = get_caller_address();
             assert(!caller.is_zero(), errors.ZERO_ADDRESS_CALLER);
@@ -228,8 +249,18 @@ pub mod PiggyStark {
             let current_balance = self.balance.entry(token_address).read();
             self.balance.entry(token_address).write(current_balance - amount);
 
-            // Emit event
+            // Deposit to Nostra Money Market
+            // let nostra_dispatcher = INostraDispatcher { contract_address: nostra_contract };
+            // let deposit_success = nostra_dispatcher.deposit(token_address, amount);
+            // assert(deposit_success, errors.NOSTRA_DEPOSIT_FAILED);
+
+            // Assume iToken address is mapped to token address
+            // let itoken_address = self.itoken_mapping.entry(token_address).read();
+            // assert(itoken_address.is_non_zero(), errors.INVALID_ITOKEN_ADDRESS);
+
+            // Emit events
             self.emit(Locked { caller, token: token_address, amount, lock_id, lock_duration });
+            // self.emit(NostraDeposit { caller, token: token_address, itoken: itoken_address, amount, lock_id });
 
             lock_id
         }
@@ -244,13 +275,18 @@ pub mod PiggyStark {
 
             // Check if lock exists and belongs to caller
             let mut lock = self.locks.entry(lock_id).read();
-            assert(lock.active, 'Inactive lock');
-            assert(lock.owner == caller, 'Not lock owner');
-            assert(lock.token_address == token_address, 'Token address mismatch');
+            assert(lock.active, errors.INACTIVE_LOCK);
+            assert(lock.owner == caller, errors.NOT_LOCK_OWNER);
+            assert(lock.token_address == token_address, errors.TOKEN_ADDRESS_MISMATCH);
 
             // Check if lock duration has passed
             let current_time = get_block_timestamp();
-            assert(current_time >= lock.lock_timestamp + lock.lock_duration, 'Lock duration not passed');
+            assert(current_time >= lock.lock_timestamp + lock.lock_duration, errors.LOCK_DURATION_NOT_EXPIRED);
+
+            // Withdraw from Nostra Money Market
+            // let nostra_dispatcher = INostraDispatcher { contract_address: nostra_contract };
+            // let withdrawal_success = nostra_dispatcher.withdraw(token_address, lock.amount);
+            // assert(withdrawal_success, 'Failed to withdraw from Nostra');
 
             // Get user's asset
             let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
@@ -274,8 +310,9 @@ pub mod PiggyStark {
             // Remove from user's locks
             self.user_locks.entry((caller, lock_id)).write(false);
 
-            // Emit event
+            // Emit events
             self.emit(Unlocked { caller, token: token_address, amount: lock.amount, lock_id });
+            // self.emit(NostraWithdrawal { caller, token: token_address, amount: lock.amount, lock_id });
         }
 
         fn get_locked_balance(self: @ContractState, user: ContractAddress, token_address: ContractAddress, lock_id: u64) -> (u256, u64) {

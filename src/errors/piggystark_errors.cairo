@@ -14,6 +14,11 @@ pub mod Errors {
         pub INCORRECT_BALANCE: felt252,
         pub ZERO_USER_ADDRESS: felt252,
         pub ZERO_LOCK_ID: felt252,
+        pub ZERO_LOCK_DURATION: felt252,
+        pub LOCK_DURATION_NOT_EXPIRED: felt252,
+        pub TOKEN_ADDRESS_MISMATCH: felt252,
+        pub INACTIVE_LOCK: felt252,
+        pub NOT_LOCK_OWNER: felt252,
     }
 
     pub fn new() -> Errors {
@@ -31,6 +36,13 @@ pub mod Errors {
             INCORRECT_BALANCE: 'incorrect balance',
             ZERO_USER_ADDRESS: 'user address cannot be zero',
             ZERO_LOCK_ID: 'lock id cannot be zero',
+            ZERO_LOCK_DURATION: 'Lock duration cannot be zero',
+            LOCK_DURATION_NOT_EXPIRED: 'Lock duration not expired',
+            TOKEN_ADDRESS_MISMATCH: 'Token address mismatch',
+            INACTIVE_LOCK: 'Inactive lock',
+            NOT_LOCK_OWNER: 'Not lock owner',
+
+
         }
     }
 }
