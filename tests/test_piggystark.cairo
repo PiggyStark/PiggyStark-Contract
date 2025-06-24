@@ -965,4 +965,50 @@ fn test_lock_savings_success() {
     spy.assert_emitted(@array![(contract.contract_address, expected_lock_event)]);
 }
 
+#[test]
+fn test_unlock_savings_success() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let amount: u256 = 1000;
+    let large_amount: u256 = 1_000_000; // Use a more reasonable amount
+    let create_amount: u256 = amount;
+    let total_approval: u256 = large_amount + create_amount;
+    let lock_duration = 459;
+
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let mut spy = spy_events();
+
+    // Give user tokens and they should approve piggy contract
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, total_approval);
+    stop_cheat_caller_address(erc20_address);
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, total_approval);
+    stop_cheat_caller_address(erc20_address);
+
+    // User actions: Create asset -> deposit (optional) -> lock
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.create_asset(erc20_address, create_amount, 'STK');
+    contract.deposit(erc20_address, large_amount);
+    let balance = contract.get_balance(user, erc20_address); // lock all user balance
+    let lock_id = contract.lock_savings(erc20_address, balance, lock_duration);
+    stop_cheat_caller_address(contract.contract_address);
+
+    // Advance time past lock duration
+    start_cheat_block_timestamp(contract.contract_address, lock_duration);
+
+    // Unlock savings
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.unlock_savings(erc20_address, lock_id);
+
+    // Verify events were emitted
+    let expected_unlock_event = Event::Unlocked(
+        Unlocked { caller: user, token: erc20_address, amount: balance, lock_id },
+    );
+
+    spy.assert_emitted(@array![(contract.contract_address, expected_unlock_event)]);
+
+    stop_cheat_caller_address(contract.contract_address);
+}
 
