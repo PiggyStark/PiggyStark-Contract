@@ -84,22 +84,6 @@ pub mod PiggyStark {
         pub lock_id: u64,
     }
 
-    #[derive(Drop, Serde, starknet::Event)]
-    pub struct NostraDeposit {
-        pub caller: ContractAddress,
-        pub token: ContractAddress,
-        pub amount: u256,
-        pub lock_id: u64,
-    }
-
-    #[derive(Drop, Serde, starknet::Event)]
-    pub struct NostraWithdrawal {
-        pub caller: ContractAddress,
-        pub token: ContractAddress,
-        pub amount: u256,
-        pub lock_id: u64,
-    }
-
     #[derive(Drop, starknet::Event)]
     pub struct TargetCreated {
         pub caller: ContractAddress,
