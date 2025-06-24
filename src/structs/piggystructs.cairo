@@ -17,3 +17,11 @@ pub struct LockedSavings {
     pub lock_timestamp: u64,
     pub active: bool,
 }
+
+#[derive(Copy, Drop, Serde, starknet::Store)]
+pub struct SavingsTarget {
+    pub id: u64,
+    pub token_address: ContractAddress,
+    pub goal: u256,
+    pub deadline: u64,
+}
