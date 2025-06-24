@@ -1012,3 +1012,46 @@ fn test_unlock_savings_success() {
     stop_cheat_caller_address(contract.contract_address);
 }
 
+#[test]
+fn test_get_locked_balance() {
+    let owner = OWNER();
+    let user = NON_OWNER();
+    let amount: u256 = 1000;
+    let large_amount: u256 = 1_000_000; // Use a more reasonable amount
+    let create_amount: u256 = amount;
+    let total_approval: u256 = large_amount + create_amount;
+    let lock_duration = 459;
+
+    let (contract, erc20_address) = setup(owner);
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+
+    let (initial_locked_amout, initial_unlocked_time) = contract
+        .get_locked_balance(user, erc20_address, 1);
+    assert(initial_locked_amout == 0, 'Wrong initial locked amount');
+    assert(initial_unlocked_time == 0, 'Wrong initial unlock time');
+
+    // Give user tokens and they should approve piggy contract
+    start_cheat_caller_address(erc20_address, owner);
+    token_dispatcher.transfer(user, total_approval);
+    stop_cheat_caller_address(erc20_address);
+    start_cheat_caller_address(erc20_address, user);
+    token_dispatcher.approve(contract.contract_address, total_approval);
+    stop_cheat_caller_address(erc20_address);
+
+    // User actions: Create asset -> deposit (optional) -> lock
+    start_cheat_caller_address(contract.contract_address, user);
+    contract.create_asset(erc20_address, create_amount, 'STK');
+    contract.deposit(erc20_address, large_amount);
+
+    // Lock savings
+    let balance = contract.get_balance(user, erc20_address); // lock all user balance
+    let lock_id = contract.lock_savings(erc20_address, balance, lock_duration);
+
+    // Get locked balance
+    let (locked_amount, unlock_time) = contract.get_locked_balance(user, erc20_address, lock_id);
+
+    assert(locked_amount == balance, 'Locked amount mismatch');
+    assert(unlock_time > 0, 'Invalid unlock time');
+}
+
+
