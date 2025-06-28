@@ -3,8 +3,9 @@ pub mod PiggyStark {
     use core::num::traits::Zero;
     use piggystark::errors::piggystark_errors::Errors;
     use piggystark::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use piggystark::interfaces::inostra::{INostraDispatcher, INostraDispatcherTrait};
     use piggystark::interfaces::ipiggystark::IPiggyStark;
-    use piggystark::structs::piggystructs::{Asset, SavingsTarget};
+    use piggystark::structs::piggystructs::{Asset, LockedSavings, SavingsTarget};
     use starknet::event::EventEmitter;
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
@@ -20,6 +21,9 @@ pub mod PiggyStark {
         >, // Map user address to a Map of token address, (option) token amount key-value
         deposited_tokens: Vec<ContractAddress>,
         balance: Map<ContractAddress, u256>, // Track total balance per token
+        locks_count: u64,
+        user_locks: Map<(ContractAddress, u64), bool>, // Maps user addresses to locks by ID
+        locks: Map<u64, LockedSavings>, // Maps lock IDs to LockedSavings
         targets_count: u64, // Total created targets, used to assign new IDs
         targets: Map<u64, SavingsTarget>, // Map SavingsTarget to its target ID
         user_targets: Map<ContractAddress, Vec<u64>>, // Map user address to their target IDs
@@ -32,6 +36,10 @@ pub mod PiggyStark {
         SuccessfulDeposit: SuccessfulDeposit,
         AssetCreated: AssetCreated,
         Withdrawal: Withdrawal,
+        Locked: Locked,
+        Unlocked: Unlocked,
+        NostraDeposit: NostraDeposit,
+        NostraWithdrawal: NostraWithdrawal,
         TargetCreated: TargetCreated,
         TargetContributed: TargetContributed,
         TargetCompleted: TargetCompleted,
@@ -57,6 +65,23 @@ pub mod PiggyStark {
         pub caller: ContractAddress,
         pub token: ContractAddress,
         pub amount: u256,
+    }
+
+    #[derive(Drop, Serde, starknet::Event)]
+    pub struct Locked {
+        pub caller: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
+        pub lock_id: u64,
+        pub lock_duration: u64,
+    }
+
+    #[derive(Drop, Serde, starknet::Event)]
+    pub struct Unlocked {
+        pub caller: ContractAddress,
+        pub token: ContractAddress,
+        pub amount: u256,
+        pub lock_id: u64,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -86,6 +111,7 @@ pub mod PiggyStark {
     #[constructor]
     fn constructor(ref self: ContractState, owner: ContractAddress) {
         self.owner.write(owner);
+        self.locks_count.write(0);
     }
 
     #[abi(embed_v0)]
@@ -137,6 +163,11 @@ pub mod PiggyStark {
             // Transfer tokens from user to contract
             let erc20_dispatcher = IERC20Dispatcher { contract_address: token_address };
             erc20_dispatcher.transfer_from(caller, _contract, amount);
+
+            // Update user deposit balance
+            let prev_asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
+            // assert(prev_asset_ref.is_none(), errors.ASSET_DOES_NOT_EXIST);
+            assert(prev_asset_ref.is_some(), errors.USER_DOES_NOT_POSSESS_TOKEN);
 
             let prev_asset = prev_asset_ref.unwrap();
             let new_balance = prev_asset.balance + amount;
@@ -345,7 +376,9 @@ pub mod PiggyStark {
             asset_ref.unwrap().balance
         }
 
-        fn get_target_savings(self: @ContractState, user: ContractAddress, target_id: u64) -> (u256, u256, u64) {
+        fn get_target_savings(
+            self: @ContractState, user: ContractAddress, target_id: u64,
+        ) -> (u256, u256, u64) {
             let errors = Errors::new();
             // Validate user address
             assert(user.is_non_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
@@ -365,6 +398,149 @@ pub mod PiggyStark {
             // Get the saved amount for this target
             let saved = self.target_balances.entry(target_id).read();
             (target_ref.goal, saved, target_ref.deadline)
+        }
+
+        fn lock_savings(
+            ref self: ContractState,
+            token_address: ContractAddress,
+            amount: u256,
+            lock_duration: u64,
+        ) -> u64 {
+            let errors = Errors::new();
+            assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
+            assert(amount > 0, errors.ZERO_TOKEN_AMOUNT);
+            assert(lock_duration > 0, errors.ZERO_LOCK_DURATION);
+
+            let caller = get_caller_address();
+            assert(!caller.is_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+
+            // Check if user has sufficient balance
+            let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
+            assert(asset_ref.is_some(), errors.ASSET_DOES_NOT_EXIST);
+
+            let asset = asset_ref.unwrap();
+            assert(asset.balance >= amount, errors.AMOUNT_OVERFLOWS_BALANCE);
+
+            // Create new lock
+            let lock_id = self.locks_count.read() + 1;
+            self.locks_count.write(lock_id);
+
+            let current_time = get_block_timestamp();
+            let new_lock = LockedSavings {
+                id: lock_id,
+                owner: caller,
+                token_address,
+                amount,
+                lock_duration,
+                lock_timestamp: current_time,
+                active: true,
+            };
+
+            // Store the lock for the user
+            self.locks.entry(lock_id).write(new_lock);
+            self.user_locks.entry((caller, lock_id)).write(true);
+
+            // Update user's asset balance
+            let new_balance = asset.balance - amount;
+            let updated_asset = Asset {
+                token_name: asset.token_name, token_address, balance: new_balance,
+            };
+            self
+                .user_deposits
+                .entry(caller)
+                .entry(token_address)
+                .write(Option::Some(updated_asset));
+
+            // Update total balance
+            let current_balance = self.balance.entry(token_address).read();
+            self.balance.entry(token_address).write(current_balance - amount);
+
+            // Deposit to Nostra Money Market
+            // let nostra_market = INostraDispatcher { contract_address: nostra_iToken };
+            // approve then mint
+            // nostra_market.mint(get_contract_address(), amount);
+
+            // Emit events
+            self.emit(Locked { caller, token: token_address, amount, lock_id, lock_duration });
+
+            lock_id
+        }
+
+        fn unlock_savings(ref self: ContractState, token_address: ContractAddress, lock_id: u64) {
+            let errors = Errors::new();
+            assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
+            assert(lock_id > 0, errors.ZERO_LOCK_ID);
+
+            let caller = get_caller_address();
+            assert(!caller.is_zero(), errors.CALLED_WITH_ZERO_ADDRESS);
+
+            // Check if lock exists and belongs to caller
+            let mut lock = self.locks.entry(lock_id).read();
+            assert(lock.active, errors.INACTIVE_LOCK);
+            assert(lock.owner == caller, errors.NOT_LOCK_OWNER);
+            assert(lock.token_address == token_address, errors.TOKEN_ADDRESS_MISMATCH);
+
+            // Check if lock duration has passed
+            let current_time = get_block_timestamp();
+            assert(
+                current_time >= lock.lock_timestamp + lock.lock_duration,
+                errors.LOCK_DURATION_NOT_EXPIRED,
+            );
+
+            // Withdraw from Nostra Money Market
+            // let nostra_market = INostraInterestTokenDispatcher { contract_address: nostra_iToken
+            // };
+            // nostra_market.burn(get_contract_address(), get_contract_address(), lock.amount);
+
+            // Get user's asset
+            let asset_ref = self.user_deposits.entry(caller).entry(token_address).read();
+            assert(asset_ref.is_some(), errors.ASSET_DOES_NOT_EXIST);
+
+            let asset = asset_ref.unwrap();
+
+            // Update user's asset balance
+            let new_balance = asset.balance + lock.amount;
+            let updated_asset = Asset {
+                token_name: asset.token_name, token_address, balance: new_balance,
+            };
+            self
+                .user_deposits
+                .entry(caller)
+                .entry(token_address)
+                .write(Option::Some(updated_asset));
+
+            // Update total balance
+            let current_balance = self.balance.entry(token_address).read();
+            self.balance.entry(token_address).write(current_balance + lock.amount);
+
+            // Deactivate lock
+            lock.active = false;
+            self.locks.entry(lock_id).write(lock);
+
+            // Remove from user's locks
+            self.user_locks.entry((caller, lock_id)).write(false);
+
+            // Emit event
+            self.emit(Unlocked { caller, token: token_address, amount: lock.amount, lock_id });
+        }
+
+        fn get_locked_balance(
+            self: @ContractState,
+            user: ContractAddress,
+            token_address: ContractAddress,
+            lock_id: u64,
+        ) -> (u256, u64) {
+            let errors = Errors::new();
+            assert(user.is_non_zero(), errors.ZERO_USER_ADDRESS);
+            assert(token_address.is_non_zero(), errors.ZERO_TOKEN_ADDRESS);
+            assert(lock_id > 0, errors.ZERO_LOCK_ID);
+
+            let lock = self.locks.entry(lock_id).read();
+            // if !lock.active || lock.owner != user || lock.token_address != token_address {
+            //     return (0, 0);
+            // }
+
+            (lock.amount, lock.lock_timestamp + lock.lock_duration)
         }
     }
 }
