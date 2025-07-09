@@ -30,13 +30,13 @@ jobs:
         profile: minimal
         override: true
 
-    - name: Cache Scarb
+    - name: Cache Scarb and Foundry
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/bin/scarb
-          ~/.foundry/bin/snforge
-          ~/.foundry/bin/sncast
+          ~/.local/bin/snfoundryup
+          ~/.foundry/bin
         key: ${{ runner.os }}-cairo-tools-${{ steps.tool-versions.outputs.scarb_version }}-${{ steps.tool-versions.outputs.foundry_version }}
         restore-keys: |
           ${{ runner.os }}-cairo-tools-
@@ -48,7 +48,9 @@ jobs:
 
     - name: Install Starknet Foundry
       run: |
-        curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh -s -- -v ${{ steps.tool-versions.outputs.foundry_version }}
+        curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
+        export PATH="$HOME/.local/bin:$PATH"
+        snfoundryup -v ${{ steps.tool-versions.outputs.foundry_version }}
         echo "$HOME/.foundry/bin" >> $GITHUB_PATH
         export PATH="$HOME/.foundry/bin:$PATH"
 
