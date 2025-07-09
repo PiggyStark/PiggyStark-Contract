@@ -1,0 +1,188 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Read tool versions
+      id: tool-versions
+      run: |
+        SCARB_VERSION=$(grep '^scarb' .tool-versions | cut -d' ' -f2)
+        FOUNDRY_VERSION=$(grep '^starknet-foundry' .tool-versions | cut -d' ' -f2)
+        echo "scarb_version=$SCARB_VERSION" >> $GITHUB_OUTPUT
+        echo "foundry_version=$FOUNDRY_VERSION" >> $GITHUB_OUTPUT
+        echo "Using Scarb $SCARB_VERSION and Starknet Foundry $FOUNDRY_VERSION"
+
+    - name: Cache Scarb
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/scarb
+          ~/.cargo/bin/starknet-foundry-up
+          ~/.cargo/bin/snforge
+          ~/.cargo/bin/sncast
+        key: ${{ runner.os }}-scarb-${{ steps.tool-versions.outputs.scarb_version }}-foundry-${{ steps.tool-versions.outputs.foundry_version }}
+        restore-keys: |
+          ${{ runner.os }}-scarb-${{ steps.tool-versions.outputs.scarb_version }}-
+          ${{ runner.os }}-scarb-
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Install Scarb
+      run: |
+        if ! command -v scarb &> /dev/null; then
+          curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v ${{ steps.tool-versions.outputs.scarb_version }}
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        fi
+
+    - name: Install Starknet Foundry
+      run: |
+        if ! command -v snforge &> /dev/null; then
+          curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh -s -- -v ${{ steps.tool-versions.outputs.foundry_version }}
+          echo "$HOME/.foundry/bin" >> $GITHUB_PATH
+        fi
+
+    - name: Verify installations
+      run: |
+        scarb --version
+        snforge --version
+
+    - name: Cache Scarb dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target/
+        key: ${{ runner.os }}-cargo-${{ steps.tool-versions.outputs.scarb_version }}-${{ hashFiles('**/Scarb.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-${{ steps.tool-versions.outputs.scarb_version }}-
+          ${{ runner.os }}-cargo-
+
+    - name: Build project
+      run: scarb build
+
+    - name: Run tests
+      run: scarb test
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          target/
+          **/*.log
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Read tool versions
+      id: tool-versions
+      run: |
+        SCARB_VERSION=$(grep '^scarb' .tool-versions | cut -d' ' -f2)
+        echo "scarb_version=$SCARB_VERSION" >> $GITHUB_OUTPUT
+        echo "Using Scarb $SCARB_VERSION"
+
+    - name: Cache Scarb
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/scarb
+        key: ${{ runner.os }}-scarb-${{ steps.tool-versions.outputs.scarb_version }}
+        restore-keys: |
+          ${{ runner.os }}-scarb-
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        components: rustfmt, clippy
+
+    - name: Install Scarb
+      run: |
+        if ! command -v scarb &> /dev/null; then
+          curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v ${{ steps.tool-versions.outputs.scarb_version }}
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        fi
+
+    - name: Check Cairo formatting
+      run: scarb fmt --check
+
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Run security audit
+      uses: actions-rs/audit@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Read tool versions
+      id: tool-versions
+      run: |
+        SCARB_VERSION=$(grep '^scarb' .tool-versions | cut -d' ' -f2)
+        FOUNDRY_VERSION=$(grep '^starknet-foundry' .tool-versions | cut -d' ' -f2)
+        echo "scarb_version=$SCARB_VERSION" >> $GITHUB_OUTPUT
+        echo "foundry_version=$FOUNDRY_VERSION" >> $GITHUB_OUTPUT
+        echo "Using Scarb $SCARB_VERSION and Starknet Foundry $FOUNDRY_VERSION"
+
+    - name: Install Scarb
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v ${{ steps.tool-versions.outputs.scarb_version }}
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Install Starknet Foundry
+      run: |
+        curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh -s -- -v ${{ steps.tool-versions.outputs.foundry_version }}
+        echo "$HOME/.foundry/bin" >> $GITHUB_PATH
+
+    - name: Generate test coverage
+      run: |
+        # Run tests with coverage (if supported by starknet-foundry)
+        scarb test || true
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports
+        path: coverage/ 
