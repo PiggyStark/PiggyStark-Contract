@@ -3,14 +3,13 @@ pub mod PiggyStark {
     use core::num::traits::Zero;
     use piggystark::errors::piggystark_errors::Errors;
     use piggystark::interfaces::ierc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use piggystark::interfaces::inostra::{INostraDispatcher, INostraDispatcherTrait};
     use piggystark::interfaces::ipiggystark::IPiggyStark;
-    use piggystark::structs::piggystructs::{Asset, LockedSavings, SavingsTarget};
     use starknet::event::EventEmitter;
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
         Vec, VecTrait,
     };
+    use piggystark::structs::piggystructs::{Asset, LockedSavings, SavingsTarget};
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
 
     #[storage]
@@ -38,8 +37,6 @@ pub mod PiggyStark {
         Withdrawal: Withdrawal,
         Locked: Locked,
         Unlocked: Unlocked,
-        NostraDeposit: NostraDeposit,
-        NostraWithdrawal: NostraWithdrawal,
         TargetCreated: TargetCreated,
         TargetContributed: TargetContributed,
         TargetCompleted: TargetCompleted,
@@ -321,7 +318,7 @@ pub mod PiggyStark {
             let len = user_targets.len();
             for i in 0..len {
                 target_ids.append(user_targets.at(i).read());
-            }
+            };
             target_ids
         }
 
@@ -330,7 +327,7 @@ pub mod PiggyStark {
             let len = self.deposited_tokens.len();
             for i in 0..len {
                 tokens.append(self.deposited_tokens.at(i).read());
-            }
+            };
             tokens
         }
 
@@ -358,7 +355,7 @@ pub mod PiggyStark {
                 assert(current_user_possesses.is_some(), 'Not owned by user');
                 let user_asset = current_user_possesses.unwrap();
                 assets.append(user_asset);
-            }
+            };
             assets
         }
 
@@ -393,7 +390,7 @@ pub mod PiggyStark {
                     found = true;
                     break;
                 }
-            }
+            };
             assert(found, errors.USER_DOES_NOT_OWN_TARGET);
             // Get the saved amount for this target
             let saved = self.target_balances.entry(target_id).read();
