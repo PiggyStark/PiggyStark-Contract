@@ -1,4 +1,4 @@
-ame: CI
+name: CI
 
 on:
   push:
@@ -50,17 +50,21 @@ jobs:
       run: |
         curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh -s -- -v ${{ steps.tool-versions.outputs.foundry_version }}
         echo "$HOME/.foundry/bin" >> $GITHUB_PATH
+        export PATH="$HOME/.foundry/bin:$PATH"
 
     - name: Verify tool versions
       run: |
+        export PATH="$HOME/.foundry/bin:$PATH"
         scarb --version
-        snforge --version || echo "snforge not available yet"
+        snforge --version
 
     - name: Build contracts
       run: scarb build
 
     - name: Run tests
-      run: scarb test
+      run: |
+        export PATH="$HOME/.foundry/bin:$PATH"
+        scarb test
 
     - name: Check formatting
       run: scarb fmt --check || echo "Format check completed"
@@ -78,8 +82,4 @@ jobs:
           echo "Scarb.toml not found!"
           exit 1
         fi
-        echo "Scarb.toml validation passed"
-
-    - name: Check for security vulnerabilities
-      run: |
-        echo "Security check placeholder - implement as needed" 
+        echo "Scarb.toml validation passed" 
